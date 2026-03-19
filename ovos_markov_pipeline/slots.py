@@ -86,6 +86,10 @@ class SlotExtractor:
         hmm = self._models[intent_name]
         bio_tags = hmm.viterbi(tokens)
 
+        # Guard: ensure tags and tokens have same length
+        if len(bio_tags) != len(tokens):
+            return {}
+
         # Parse BIO tags into slot values
         slots: Dict[str, str] = {}
         current_slot: Optional[str] = None

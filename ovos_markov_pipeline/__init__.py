@@ -253,7 +253,7 @@ class MarkovIntentEngine:
         for name, mc in self._models.items():
             if name in blacklisted_intents:
                 continue
-            skill_id = name.split(":")[0]
+            skill_id = name.split(":")[0] if ":" in name else name
             if skill_id in blacklisted_skills:
                 continue
 
@@ -276,17 +276,19 @@ class MarkovIntentEngine:
                 for name, mc in self._char_models.items():
                     if name in blacklisted_intents:
                         continue
-                    skill_id = name.split(":")[0]
+                    skill_id = name.split(":")[0] if ":" in name else name
                     if skill_id in blacklisted_skills:
                         continue
                     ppx = mc.perplexity([char_tokens])
                     char_scores[name] = _ppx_to_confidence(ppx)
 
-                # Blend: 60% word + 40% char
+                # Blend: 60% word + 40% char (use word-only if no char model)
                 blended: List[Tuple[str, float]] = []
                 for name, word_conf in scores:
-                    char_conf = char_scores.get(name, 0.0)
-                    blended.append((name, 0.6 * word_conf + 0.4 * char_conf))
+                    if name in char_scores:
+                        blended.append((name, 0.6 * word_conf + 0.4 * char_scores[name]))
+                    else:
+                        blended.append((name, word_conf))
                 blended.sort(key=lambda x: -x[1])
                 return blended
 
@@ -361,7 +363,14 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         self.conf_med = self.config.get("conf_med", 0.55)
         self.conf_low = self.config.get("conf_low", 0.30)
 
-        order = self.config.get("order", 2)
+        # Validate threshold ordering
+        if not (self.conf_low <= self.conf_med <= self.conf_high):
+            LOG.warning(
+                f"Confidence thresholds not ordered: "
+                f"low={self.conf_low} med={self.conf_med} high={self.conf_high}"
+            )
+
+        order = max(1, int(self.config.get("order", 2)))
         kneser_ney = self.config.get("kneser_ney", True)
         backoff = self.config.get("backoff", True)
         smoothing = self.config.get("smoothing", 1e-5)
@@ -436,14 +445,26 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
             LOG.warning("Skill ID missing, using 'anonymous_skill'")
             skill_id = "anonymous_skill"
 
-        name = message.data["name"]
+        name = message.data.get("name")
+        if not name:
+            LOG.error("Intent registration missing 'name' field")
+            return
+
         lang = standardize_lang_tag(message.data.get("lang", self.lang))
         samples = message.data.get("samples")
 
+        # Validate samples type
+        if samples is not None and not isinstance(samples, list):
+            LOG.warning(f"Intent {name}: samples is {type(samples).__name__}, expected list")
+            samples = list(samples) if hasattr(samples, "__iter__") else None
+
         file_name = message.data.get("file_name")
-        if not samples and file_name and Path(file_name).is_file():
-            with open(file_name) as f:
-                samples = [line.strip() for line in f.readlines()]
+        if not samples and file_name:
+            try:
+                with open(file_name) as f:
+                    samples = [line.strip() for line in f.readlines()]
+            except (OSError, IOError) as e:
+                LOG.error(f"Failed to read intent file {file_name}: {e}")
 
         if not samples:
             LOG.error(f"No samples for intent {name}")
@@ -541,11 +562,12 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                 best_intent, best_conf = scores[0]
 
         if best_intent is not None and best_conf > limit:
-            skill_id = best_intent.split(":")[0]
+            skill_id = best_intent.split(":")[0] if ":" in best_intent else best_intent
 
-            # Online learning: reinforce successful matches
+            # Online learning: reinforce successful matches (thread-safe)
             if self.online_learning and best_conf > self.conf_high:
-                engine.update_online(best_intent, utterances[0])
+                with self.lock:
+                    engine.update_online(best_intent, utterances[0])
 
             return IntentHandlerMatch(
                 match_type=best_intent,

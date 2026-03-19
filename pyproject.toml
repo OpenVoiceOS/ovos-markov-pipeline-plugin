@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+stem = ["snowballstemmer"]
+test = ["pytest", "pytest-cov", "snowballstemmer"]
 
 [project.entry-points."opm.pipeline"]
 ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"

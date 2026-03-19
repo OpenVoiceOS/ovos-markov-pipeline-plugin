@@ -11,7 +11,7 @@ import math
 import re
 import string
 from collections import defaultdict
-from os.path import expanduser
+from functools import lru_cache
 from pathlib import Path
 from threading import Event, RLock
 from typing import Dict, List, Optional, Tuple, Union
@@ -21,7 +21,6 @@ from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
-from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.templates.pipeline import (
     ConfidenceMatcherPipeline,
     IntentHandlerMatch,
@@ -29,18 +28,57 @@ from ovos_plugin_manager.templates.pipeline import (
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
-from ovos_utils.xdg_utils import xdg_data_home
 
-from markovonnx import MarkovChain, Vocabulary, word_tokenize
+from markovonnx import MarkovChain, Vocabulary, char_tokenize, word_tokenize
 
 from ovos_markov_pipeline.version import __version__
 
 
-def _normalize(text: str) -> str:
-    """Lowercase, collapse whitespace, strip punctuation."""
+# ---------------------------------------------------------------------------
+# Stemmer (adapted from ovos-padatious-pipeline-plugin)
+# ---------------------------------------------------------------------------
+
+class _Stemmer:
+    """Snowball stemmer wrapper. Fails gracefully if unsupported."""
+
+    _LANGS = {
+        "ar": "arabic", "eu": "basque", "ca": "catalan", "da": "danish",
+        "nl": "dutch", "en": "english", "fi": "finnish", "fr": "french",
+        "de": "german", "el": "greek", "hi": "hindi", "hu": "hungarian",
+        "id": "indonesian", "ga": "irish", "it": "italian", "lt": "lithuanian",
+        "ne": "nepali", "no": "norwegian", "pt": "portuguese", "ro": "romanian",
+        "ru": "russian", "sr": "serbian", "es": "spanish", "sv": "swedish",
+        "ta": "tamil", "tr": "turkish",
+    }
+
+    def __init__(self, lang: str):
+        import snowballstemmer
+        lang2 = lang.split("-")[0].lower()
+        if lang2 not in self._LANGS:
+            raise ValueError(f"Unsupported stemmer language: {lang}")
+        self._stemmer = snowballstemmer.stemmer(self._LANGS[lang2])
+
+    @classmethod
+    def supports(cls, lang: str) -> bool:
+        """Check if stemming is available for *lang*."""
+        return lang.split("-")[0].lower() in cls._LANGS
+
+    def stem(self, sentence: str) -> str:
+        """Stem all words in a sentence."""
+        return " ".join(self._stemmer.stemWords(sentence.split()))
+
+
+# ---------------------------------------------------------------------------
+# Normalization helpers
+# ---------------------------------------------------------------------------
+
+def _normalize(text: str, stemmer: Optional[_Stemmer] = None) -> str:
+    """Lowercase, collapse whitespace, strip punctuation, optionally stem."""
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
     text = text.rstrip(string.punctuation)
+    if stemmer is not None:
+        text = stemmer.stem(text)
     return text
 
 
@@ -56,17 +94,24 @@ def _ppx_to_confidence(ppx: float) -> float:
     return max(0.0, min(1.0, 1.0 / (1.0 + math.log(ppx))))
 
 
+# ---------------------------------------------------------------------------
+# MarkovIntentEngine
+# ---------------------------------------------------------------------------
+
 class MarkovIntentEngine:
     """Per-language intent matching engine using Markov chain perplexity.
 
     Maintains a shared vocabulary and one MarkovChain per registered intent.
-    Intents are re-trained when new samples are added.
+    Optionally trains a character-level fallback ensemble for when word-level
+    scores are too close to discriminate.
 
     Args:
         order: N-gram order for Markov chains.
         smoothing: Laplace smoothing alpha.
         kneser_ney: Use Kneser-Ney smoothing instead of Laplace.
         backoff: Enable interpolated backoff to lower-order models.
+        stemmer: Optional stemmer for normalizing samples and queries.
+        char_fallback: Train character-level models as fallback.
     """
 
     def __init__(
@@ -75,15 +120,21 @@ class MarkovIntentEngine:
         smoothing: float = 1e-5,
         kneser_ney: bool = True,
         backoff: bool = True,
+        stemmer: Optional[_Stemmer] = None,
+        char_fallback: bool = False,
     ):
         self.order = order
         self.smoothing = smoothing
         self.kneser_ney = kneser_ney
         self.backoff = backoff
+        self.stemmer = stemmer
+        self.char_fallback = char_fallback
 
-        self._intent_samples: Dict[str, List[List[str]]] = {}
+        self._intent_samples: Dict[str, List[str]] = {}  # raw strings
         self._models: Dict[str, MarkovChain] = {}
+        self._char_models: Dict[str, MarkovChain] = {}
         self._vocab: Optional[Vocabulary] = None
+        self._char_vocab: Optional[Vocabulary] = None
         self._trained = False
 
     @property
@@ -92,55 +143,86 @@ class MarkovIntentEngine:
         return not self._trained and len(self._intent_samples) > 0
 
     def add_intent(self, name: str, samples: List[str]) -> None:
-        """Register an intent with training samples.
-
-        Args:
-            name: Intent name (typically ``skill_id:intent_name``).
-            samples: List of example utterances.
-        """
-        tokenized = [word_tokenize(_normalize(s)) for s in samples if s.strip()]
-        tokenized = [s for s in tokenized if len(s) > 0]
-        self._intent_samples[name] = tokenized
+        """Register an intent with training samples."""
+        cleaned = [s.strip() for s in samples if s.strip()]
+        self._intent_samples[name] = cleaned
         self._trained = False
 
     def remove_intent(self, name: str) -> None:
         """Remove a registered intent."""
         self._intent_samples.pop(name, None)
         self._models.pop(name, None)
+        self._char_models.pop(name, None)
         self._trained = False
 
-    def train(self) -> None:
-        """Train all intent models on current samples.
+    def _tokenize_word(self, samples: List[str]) -> List[List[str]]:
+        """Normalize and word-tokenize samples."""
+        return [
+            word_tokenize(_normalize(s, self.stemmer))
+            for s in samples
+            if _normalize(s, self.stemmer)
+        ]
 
-        Builds a shared vocabulary from all samples, then trains one
-        MarkovChain per intent.
-        """
+    def _tokenize_char(self, samples: List[str]) -> List[List[str]]:
+        """Normalize and char-tokenize samples."""
+        return [
+            char_tokenize(_normalize(s, self.stemmer))
+            for s in samples
+            if _normalize(s, self.stemmer)
+        ]
+
+    def train(self) -> None:
+        """Train all intent models on current samples."""
         if not self._intent_samples:
             self._trained = True
             return
 
-        # Build shared vocabulary from ALL intent samples
-        all_sequences = []
-        for samples in self._intent_samples.values():
-            all_sequences.extend(samples)
+        # Word-level models
+        all_word_seqs: List[List[str]] = []
+        intent_word_seqs: Dict[str, List[List[str]]] = {}
+        for name, raw in self._intent_samples.items():
+            seqs = self._tokenize_word(raw)
+            intent_word_seqs[name] = seqs
+            all_word_seqs.extend(seqs)
 
         self._vocab = Vocabulary()
-        self._vocab.build_from_sequences(all_sequences)
+        self._vocab.build_from_sequences(all_word_seqs)
 
-        # Train one model per intent
         self._models = {}
-        for name, samples in self._intent_samples.items():
-            if not samples:
+        for name, seqs in intent_word_seqs.items():
+            if not seqs:
                 continue
             mc = MarkovChain(
-                order=self.order,
-                vocab=self._vocab,
-                smoothing=self.smoothing,
-                backoff=self.backoff,
+                order=self.order, vocab=self._vocab,
+                smoothing=self.smoothing, backoff=self.backoff,
                 kneser_ney=self.kneser_ney,
             )
-            mc.fit(samples)
+            mc.fit(seqs)
             self._models[name] = mc
+
+        # Character-level fallback models
+        if self.char_fallback:
+            all_char_seqs: List[List[str]] = []
+            intent_char_seqs: Dict[str, List[List[str]]] = {}
+            for name, raw in self._intent_samples.items():
+                seqs = self._tokenize_char(raw)
+                intent_char_seqs[name] = seqs
+                all_char_seqs.extend(seqs)
+
+            self._char_vocab = Vocabulary()
+            self._char_vocab.build_from_sequences(all_char_seqs)
+
+            self._char_models = {}
+            for name, seqs in intent_char_seqs.items():
+                if not seqs:
+                    continue
+                mc = MarkovChain(
+                    order=3, vocab=self._char_vocab,
+                    smoothing=self.smoothing, backoff=True,
+                    kneser_ney=self.kneser_ney,
+                )
+                mc.fit(seqs)
+                self._char_models[name] = mc
 
         self._trained = True
 
@@ -152,13 +234,7 @@ class MarkovIntentEngine:
     ) -> List[Tuple[str, float]]:
         """Score all intents for an utterance.
 
-        Args:
-            utterance: The user's text.
-            blacklisted_intents: Intent names to skip.
-            blacklisted_skills: Skill IDs to skip.
-
-        Returns:
-            List of ``(intent_name, confidence)`` sorted by descending confidence.
+        Returns list of ``(intent_name, confidence)`` sorted descending.
         """
         if not self._models or self._vocab is None:
             return []
@@ -166,8 +242,9 @@ class MarkovIntentEngine:
         blacklisted_intents = blacklisted_intents or set()
         blacklisted_skills = blacklisted_skills or set()
 
-        tokens = word_tokenize(_normalize(utterance))
-        if len(tokens) < self.order:
+        norm = _normalize(utterance, self.stemmer)
+        word_tokens = word_tokenize(norm)
+        if len(word_tokens) < self.order:
             return []
 
         scores: List[Tuple[str, float]] = []
@@ -178,21 +255,83 @@ class MarkovIntentEngine:
             if skill_id in blacklisted_skills:
                 continue
 
-            ppx = mc.perplexity([tokens])
+            ppx = mc.perplexity([word_tokens])
             conf = _ppx_to_confidence(ppx)
             scores.append((name, conf))
 
         scores.sort(key=lambda x: -x[1])
+
+        # Character-level fallback: if top-2 word scores are too close
+        if (
+            self.char_fallback
+            and self._char_models
+            and len(scores) >= 2
+            and scores[0][1] - scores[1][1] < 0.05
+        ):
+            char_tokens = char_tokenize(norm)
+            if len(char_tokens) >= 3:
+                char_scores: Dict[str, float] = {}
+                for name, mc in self._char_models.items():
+                    if name in blacklisted_intents:
+                        continue
+                    skill_id = name.split(":")[0]
+                    if skill_id in blacklisted_skills:
+                        continue
+                    ppx = mc.perplexity([char_tokens])
+                    char_scores[name] = _ppx_to_confidence(ppx)
+
+                # Blend: 60% word + 40% char
+                blended: List[Tuple[str, float]] = []
+                for name, word_conf in scores:
+                    char_conf = char_scores.get(name, 0.0)
+                    blended.append((name, 0.6 * word_conf + 0.4 * char_conf))
+                blended.sort(key=lambda x: -x[1])
+                return blended
+
         return scores
 
+    def update_online(self, intent_name: str, utterance: str) -> None:
+        """Incrementally update a single intent model with a new utterance.
+
+        Adds the utterance to the intent's samples and re-trains only
+        that intent's model (not the full vocabulary rebuild).
+
+        Args:
+            intent_name: The intent to update.
+            utterance: New example utterance.
+        """
+        if intent_name not in self._intent_samples:
+            return
+        self._intent_samples[intent_name].append(utterance.strip())
+        if self._vocab is None:
+            return
+
+        # Update vocab with any new tokens
+        word_tokens = word_tokenize(_normalize(utterance, self.stemmer))
+        for tok in word_tokens:
+            if tok not in self._vocab.tok2id:
+                idx = len(self._vocab.id2tok)
+                self._vocab.id2tok.append(tok)
+                self._vocab.tok2id[tok] = idx
+
+        # Re-train just this intent's model
+        seqs = self._tokenize_word(self._intent_samples[intent_name])
+        if seqs:
+            mc = MarkovChain(
+                order=self.order, vocab=self._vocab,
+                smoothing=self.smoothing, backoff=self.backoff,
+                kneser_ney=self.kneser_ney,
+            )
+            mc.fit(seqs)
+            self._models[intent_name] = mc
+
+
+# ---------------------------------------------------------------------------
+# MarkovPipeline (OPM ConfidenceMatcherPipeline)
+# ---------------------------------------------------------------------------
 
 class MarkovPipeline(ConfidenceMatcherPipeline):
     """OVOS pipeline plugin for Markov chain perplexity-based intent matching.
-
-    Follows the same pattern as ``PadatiousPipeline``: skills register
-    intent samples via the MessageBus, the engine trains on them, and
-    incoming utterances are classified by comparing perplexity across
-    all registered intent models.
 
     Configuration (in ``mycroft.conf``):
 
@@ -204,6 +343,9 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                     "order": 2,
                     "kneser_ney": true,
                     "backoff": true,
+                    "stem": false,
+                    "char_fallback": false,
+                    "online_learning": false,
                     "conf_high": 0.75,
                     "conf_med": 0.55,
                     "conf_low": 0.30
@@ -237,6 +379,19 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         kneser_ney = self.config.get("kneser_ney", True)
         backoff = self.config.get("backoff", True)
         smoothing = self.config.get("smoothing", 1e-5)
+        use_stemmer = self.config.get("stem", False)
+        char_fallback = self.config.get("char_fallback", False)
+        self.online_learning = self.config.get("online_learning", False)
+
+        # Build per-language stemmers
+        self.stemmers: Dict[str, _Stemmer] = {}
+        if use_stemmer:
+            for lang in langs:
+                if _Stemmer.supports(lang):
+                    try:
+                        self.stemmers[lang] = _Stemmer(lang)
+                    except Exception:
+                        pass
 
         self.engines: Dict[str, MarkovIntentEngine] = {
             lang: MarkovIntentEngine(
@@ -244,6 +399,8 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                 smoothing=smoothing,
                 kneser_ney=kneser_ney,
                 backoff=backoff,
+                stemmer=self.stemmers.get(lang),
+                char_fallback=char_fallback,
             )
             for lang in langs
         }
@@ -266,14 +423,16 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
             self.handle_manifest,
         )
 
-        LOG.info(f"Loaded MarkovPipeline (order={order}, kn={kneser_ney}, backoff={backoff})")
+        LOG.info(
+            f"Loaded MarkovPipeline (order={order}, kn={kneser_ney}, "
+            f"backoff={backoff}, stem={use_stemmer}, char_fb={char_fallback})"
+        )
 
     def _get_closest_lang(self, lang: str) -> Optional[str]:
         """Find the closest registered language."""
         lang = standardize_lang_tag(lang)
         if lang in self.engines:
             return lang
-        # Simple prefix match
         prefix = lang.split("-")[0]
         for registered in self.engines:
             if registered.startswith(prefix):
@@ -283,11 +442,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
     # -- Intent registration --------------------------------------------------
 
     def register_intent(self, message: Message) -> None:
-        """Handle ``padatious:register_intent`` bus message.
-
-        Accepts the same format as Padatious: ``name``, ``samples`` or
-        ``file_name``, ``skill_id``, ``lang``.
-        """
+        """Handle ``padatious:register_intent`` bus message."""
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
         if not skill_id:
             LOG.warning("Skill ID missing, using 'anonymous_skill'")
@@ -297,7 +452,6 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         lang = standardize_lang_tag(message.data.get("lang", self.lang))
         samples = message.data.get("samples")
 
-        # Load from file if no inline samples
         file_name = message.data.get("file_name")
         if not samples and file_name and Path(file_name).is_file():
             with open(file_name) as f:
@@ -400,6 +554,11 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
 
         if best_intent is not None and best_conf > limit:
             skill_id = best_intent.split(":")[0]
+
+            # Online learning: reinforce successful matches
+            if self.online_learning and best_conf > self.conf_high:
+                engine.update_online(best_intent, utterances[0])
+
             return IntentHandlerMatch(
                 match_type=best_intent,
                 match_data={

@@ -1,7 +1,19 @@
 # Maintenance Report
 
+## 2026-03-19 — Stemming, char fallback, online learning (v0.1.0)
+
+- **AI Model**: Claude Opus 4.6
+- **Actions Taken**:
+  - Added snowball stemmer support (`"stem": true` config)
+  - Added character-level fallback blending (60/40 word/char when ambiguous)
+  - Added online learning (incremental model update on high-confidence matches)
+  - Added file-based intent registration support
+  - Refactored engine to store raw samples for flexible re-tokenization
+  - 50 tests, 92% coverage
+- **Oversight**: Human-approved feature list before implementation.
+
 ## 2026-03-19 — Initial implementation
 
 - **AI Model**: Claude Opus 4.6
-- **Actions Taken**: Created OVOS pipeline plugin from scratch using markovonnx perplexity ensemble. Implemented `MarkovIntentEngine` (per-language Markov chain ensemble), `MarkovPipeline` (OPM `ConfidenceMatcherPipeline` subclass), bus message handlers, training, confidence scoring. 34 tests, 95% coverage.
-- **Oversight**: Human-reviewed architecture design before implementation.
+- **Actions Taken**: Created pipeline plugin with MarkovIntentEngine and MarkovPipeline.
+- **Oversight**: Human-reviewed architecture design.

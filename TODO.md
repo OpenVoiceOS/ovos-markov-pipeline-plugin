@@ -2,12 +2,12 @@
 
 - [x] Initial pipeline plugin (MarkovPipeline, MarkovIntentEngine)
 - [x] Stemming support (snowball stemmer)
-- [x] Character-level fallback (blended 60/40 word/char when word scores ambiguous)
+- [x] Character-level fallback (blended 60/40 word/char when ambiguous)
 - [x] Online learning (incremental model update on high-confidence matches)
 - [x] File-based intent registration
-- [ ] Entity extraction via HMM (BIO tagging)
-- [ ] ONNX export for trained intents (disk cache)
-- [ ] Confidence calibration (precision/recall analysis)
-- [ ] Hybrid pipeline (Markov + Model2Vec two-stage)
-- [ ] ovoscope E2E tests
-- [ ] GitHub workflows (ovos-workflows-adder)
+- [x] Entity extraction via HMM (BIO tagging) — `slots.py`
+- [x] ONNX export cache for trained intents — `cache.py`
+- [x] Confidence calibration (evaluate + find_optimal_thresholds) — `calibration.py`
+- [x] GitHub workflows (ovos-workflows-adder)
+- [x] OVOS version block format
+- [ ] ovoscope E2E tests (needs test skill)

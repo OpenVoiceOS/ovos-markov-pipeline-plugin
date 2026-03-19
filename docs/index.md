@@ -2,21 +2,24 @@
 
 OVOS intent pipeline plugin using Markov chain perplexity ensemble from markovonnx.
 
-## How It Works
+## Architecture
 
-1. Skills register intent samples via `padatious:register_intent`
-2. One word-level Markov chain per intent, all sharing a common vocabulary
-3. On match: perplexity computed under each model — lowest wins
-4. Confidence: `conf = 1 / (1 + log(ppx))`
-5. Optional: char-level fallback blending, stemming, online learning
+```
+Utterance → normalize (+ stem) → word tokenize
+  → compute perplexity under each intent model
+  → lowest PPX wins → confidence = 1/(1+log(ppx))
+  → optional: char-level fallback blend when ambiguous
+  → optional: HMM BIO slot extraction on matched intent
+```
 
-## Key Classes
+## Modules
 
-| Class | Description |
-|-------|-------------|
-| `MarkovPipeline` | `ConfidenceMatcherPipeline` subclass — OPM entry point |
-| `MarkovIntentEngine` | Per-language perplexity ensemble with shared vocab |
-| `_Stemmer` | Snowball stemmer wrapper for word normalization |
+| Module | Description |
+|--------|-------------|
+| `__init__.py` | `MarkovPipeline` (OPM entry), `MarkovIntentEngine` (per-lang ensemble) |
+| `slots.py` | `SlotExtractor` — HMM BIO tagging for entity extraction |
+| `cache.py` | `IntentCache` — ONNX disk cache for trained models |
+| `calibration.py` | `evaluate()`, `find_optimal_thresholds()` — confidence tuning |
 
 ## Configuration
 
@@ -41,26 +44,22 @@ OVOS intent pipeline plugin using Markov chain perplexity ensemble from markovon
 }
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `order` | 2 | N-gram order for word-level models |
-| `kneser_ney` | true | Kneser-Ney smoothing (better than Laplace for small data) |
-| `backoff` | true | Fall back to lower-order models for unseen contexts |
-| `stem` | false | Apply snowball stemmer to normalize word forms |
-| `char_fallback` | false | Train char-level models, blend when word scores are ambiguous |
-| `online_learning` | false | Reinforce high-confidence matches by updating models |
-| `conf_high` | 0.75 | Minimum confidence for high-tier match |
-| `conf_med` | 0.55 | Minimum confidence for medium-tier match |
-| `conf_low` | 0.30 | Minimum confidence for low-tier match |
-
 ## Bus Messages
 
 | Message | Direction | Description |
 |---------|-----------|-------------|
-| `padatious:register_intent` | In | Register intent samples (or file) |
-| `detach_intent` | In | Remove single intent |
-| `detach_skill` | In | Remove all intents for skill |
+| `padatious:register_intent` | In | Register intent samples |
+| `detach_intent` / `detach_skill` | In | Remove intents |
 | `mycroft.skills.train` | In | Trigger training |
 | `mycroft.skills.trained` | Out | Training complete |
-| `intent.service.markov.manifest.get` | In | Query registered intents |
-| `intent.service.markov.manifest` | Out | Reply with intent list |
+| `intent.service.markov.manifest.get/manifest` | In/Out | Query registered intents |
+
+## Features
+
+- **Stemming**: Snowball stemmer for 26 languages (`"stem": true`)
+- **Char fallback**: Blend 60% word + 40% char scores when top-2 are ambiguous
+- **Online learning**: High-confidence matches reinforce intent models incrementally
+- **Entity extraction**: HMM Viterbi BIO tagging via `SlotExtractor`
+- **ONNX cache**: `IntentCache` saves/loads models as sparse ONNX + vocab JSON
+- **Calibration**: `evaluate()` for P/R/F1, `find_optimal_thresholds()` for threshold tuning
+- **CI/CD**: Full OVOS workflow suite (build-tests, OPM check, coverage, release, etc.)

@@ -1,28 +1,31 @@
 # FAQ
 
 ## What is this plugin?
-An OVOS pipeline plugin that classifies intents by training one Markov chain per intent and selecting the model with lowest perplexity on the input utterance.
+An OVOS pipeline plugin that classifies intents by training one Markov chain per intent and selecting the model with lowest perplexity.
 
 ## How does confidence scoring work?
-`confidence = 1 / (1 + log(perplexity))`. Lower perplexity means the utterance is more likely under that intent's model, producing higher confidence.
+`confidence = 1 / (1 + log(perplexity))`. Lower perplexity = higher confidence. Use `calibration.find_optimal_thresholds()` to tune thresholds empirically.
 
 ## What order should I use?
-Order 1 works best with small training sets (5-20 examples). Order 2 needs 20+ examples per intent.
+Order 1 for small training sets (5-20 examples). Order 2 for 20+ examples per intent.
 
 ## Does stemming help?
-Yes, set `"stem": true` in config. Uses snowball stemmer to normalize word forms (running→run, dogs→dog). Significant improvement for inflected languages.
+Yes, set `"stem": true`. Uses snowball stemmer for 26 languages.
 
 ## What is the character-level fallback?
-When `"char_fallback": true`, the engine trains char-level models alongside word-level. If the top-2 word-level scores are within 0.05 of each other, it blends 60% word + 40% char scores to break the tie.
+When `"char_fallback": true`, char-level models are trained alongside word-level. If top-2 word scores are within 0.05, a 60/40 word/char blend breaks the tie.
 
 ## What is online learning?
-When `"online_learning": true`, high-confidence matches are fed back into the intent model. The matched utterance is added to the intent's training data and the model is incrementally updated — no full retrain needed.
+When `"online_learning": true`, high-confidence matches are fed back into the model incrementally — no full retrain.
 
 ## Does it support entities/slots?
-Not yet. Entity extraction via HMM (BIO tagging) is planned.
+Yes — `SlotExtractor` uses HMM Viterbi decoding with BIO tags. Train with `(utterance, BIO-tags)` pairs, then call `extract(intent, tokens)` to get `{slot_name: value}`.
 
-## How does it compare to Padatious?
-Padatious uses template matching with neural scoring. Markov is simpler, trains instantly, no native code deps. Padatious has better accuracy with pattern templates (``{entity}`` syntax).
+## Can I cache models to disk?
+Yes — `IntentCache` exports trained models as ONNX + vocab JSON for instant reload on restart.
 
-## How does it compare to Model2Vec?
-Model2Vec uses semantic embeddings (300MB+ model). Markov is kilobytes, trains in milliseconds, but doesn't understand semantic similarity — only word co-occurrence patterns.
+## How do I calibrate thresholds?
+Use `calibration.evaluate()` for accuracy/F1 metrics and `find_optimal_thresholds()` to grid-search the best confidence cutoff on labelled data.
+
+## What CI workflows are included?
+Standard OVOS set: build-tests, lint, coverage, release workflow, publish stable, OPM check, license check, pip audit, repo health, release preview.

@@ -10,4 +10,5 @@
 - [x] Confidence calibration (evaluate + find_optimal_thresholds) — `calibration.py`
 - [x] GitHub workflows (ovos-workflows-adder)
 - [x] OVOS version block format
-- [ ] ovoscope E2E tests (needs test skill)
+- [x] Fix all audit issues (race condition, input validation, etc.)
+- [x] ovoscope E2E tests (hello-world + naptime skills, multi-skill routing)

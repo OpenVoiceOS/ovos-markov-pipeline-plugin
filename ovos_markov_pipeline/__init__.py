@@ -122,6 +122,7 @@ class MarkovIntentEngine:
         backoff: bool = True,
         stemmer: Optional[_Stemmer] = None,
         char_fallback: bool = False,
+        char_fallback_threshold: float = 0.05,
     ):
         self.order = order
         self.smoothing = smoothing
@@ -129,6 +130,7 @@ class MarkovIntentEngine:
         self.backoff = backoff
         self.stemmer = stemmer
         self.char_fallback = char_fallback
+        self.char_fallback_threshold = char_fallback_threshold
 
         self._intent_samples: Dict[str, List[str]] = {}  # raw strings
         self._models: Dict[str, MarkovChain] = {}
@@ -266,7 +268,7 @@ class MarkovIntentEngine:
             self.char_fallback
             and self._char_models
             and len(scores) >= 2
-            and scores[0][1] - scores[1][1] < 0.05
+            and scores[0][1] - scores[1][1] < self.char_fallback_threshold
         ):
             char_tokens = char_tokenize(norm)
             if len(char_tokens) >= 3:
@@ -291,10 +293,10 @@ class MarkovIntentEngine:
         return scores
 
     def update_online(self, intent_name: str, utterance: str) -> None:
-        """Incrementally update a single intent model with a new utterance.
+        """Add a new utterance to an intent and retrain.
 
-        Adds the utterance to the intent's samples and re-trains only
-        that intent's model (not the full vocabulary rebuild).
+        Adds the utterance to the intent's samples, rebuilds the shared
+        vocabulary, and retrains all models to keep count arrays consistent.
 
         Args:
             intent_name: The intent to update.
@@ -305,25 +307,9 @@ class MarkovIntentEngine:
         self._intent_samples[intent_name].append(utterance.strip())
         if self._vocab is None:
             return
-
-        # Update vocab with any new tokens
-        word_tokens = word_tokenize(_normalize(utterance, self.stemmer))
-        for tok in word_tokens:
-            if tok not in self._vocab.tok2id:
-                idx = len(self._vocab.id2tok)
-                self._vocab.id2tok.append(tok)
-                self._vocab.tok2id[tok] = idx
-
-        # Re-train just this intent's model
-        seqs = self._tokenize_word(self._intent_samples[intent_name])
-        if seqs:
-            mc = MarkovChain(
-                order=self.order, vocab=self._vocab,
-                smoothing=self.smoothing, backoff=self.backoff,
-                kneser_ney=self.kneser_ney,
-            )
-            mc.fit(seqs)
-            self._models[intent_name] = mc
+        # Full retrain to keep vocab and count arrays consistent
+        self._trained = False
+        self.train()
 
 
 # ---------------------------------------------------------------------------
@@ -381,6 +367,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         smoothing = self.config.get("smoothing", 1e-5)
         use_stemmer = self.config.get("stem", False)
         char_fallback = self.config.get("char_fallback", False)
+        char_fallback_threshold = self.config.get("char_fallback_threshold", 0.05)
         self.online_learning = self.config.get("online_learning", False)
 
         # Build per-language stemmers
@@ -401,6 +388,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                 backoff=backoff,
                 stemmer=self.stemmers.get(lang),
                 char_fallback=char_fallback,
+                char_fallback_threshold=char_fallback_threshold,
             )
             for lang in langs
         }

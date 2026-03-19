@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ovos-markov-pipeline-plugin"
+dynamic = ["version"]
+description = "OVOS intent pipeline plugin using Markov chain perplexity ensemble"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "markovonnx>=0.3.0",
+    "ovos-plugin-manager>=0.0.1",
+    "ovos-bus-client>=0.1.0",
+    "ovos-utils>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+
+[project.entry-points."opm.pipeline"]
+ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"
+
+[tool.setuptools.dynamic]
+version = { attr = "ovos_markov_pipeline.version.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["ovos_markov_pipeline*"]

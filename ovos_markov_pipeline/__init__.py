@@ -671,3 +671,9 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
             "intent.service.markov.manifest.get",
             self.handle_manifest,
         )
+
+
+# Re-export DomainMarkovIntentEngine at the package root for parity with
+# the other OVOS intent plugins (nebulento, ovos-padatious, palavreado,
+# padacioso, linha_fina).
+from ovos_markov_pipeline.domain_engine import DomainMarkovIntentEngine  # noqa: E402, F401

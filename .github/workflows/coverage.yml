@@ -8,10 +8,9 @@ on:
 jobs:
   coverage:
     uses: OpenVoiceOS/gh-automations/.github/workflows/coverage.yml@dev
-    secrets: inherit
     with:
       python_version: '3.11'
-      coverage_source: 'ovos_markov_pipeline_plugin'
-      test_path: 'test/'
-      install_extras: ''
+      coverage_source: 'ovos_markov_pipeline'
+      test_path: 'test'
+      install_extras: 'test'
       min_coverage: 0

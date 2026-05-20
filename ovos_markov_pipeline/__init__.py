@@ -159,7 +159,7 @@ class MarkovIntentEngine:
         helper, and the resulting concrete utterances are used as training
         data.
         """
-        expanded: List[str] = []
+        expanded: set = set()
         for s in samples:
             if not s or not s.strip():
                 continue
@@ -167,20 +167,13 @@ class MarkovIntentEngine:
                 for variant in expand_template(s):
                     v = variant.strip()
                     if v:
-                        expanded.append(v)
+                        expanded.add(v)
             except Exception:
                 # Fall back to the raw sample if expansion fails for any reason
                 v = s.strip()
                 if v:
-                    expanded.append(v)
-        # Deduplicate while preserving order
-        seen = set()
-        cleaned: List[str] = []
-        for s in expanded:
-            if s not in seen:
-                seen.add(s)
-                cleaned.append(s)
-        self._intent_samples[name] = cleaned
+                    expanded.add(v)
+        self._intent_samples[name] = list(expanded)
         self._trained = False
 
     def remove_intent(self, name: str) -> None:

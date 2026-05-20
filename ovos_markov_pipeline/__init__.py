@@ -25,8 +25,9 @@ from ovos_plugin_manager.templates.pipeline import (
     ConfidenceMatcherPipeline,
     IntentHandlerMatch,
 )
-from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.fakebus import FakeBus
+
+from ovos_markov_pipeline._bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 
@@ -153,9 +154,10 @@ class MarkovIntentEngine:
             ``[opt]``  optional components
             ``{slot}`` slot placeholders (kept verbatim as features)
 
-        Each template is expanded via
-        :func:`ovos_utils.bracket_expansion.expand_template`, and the
-        resulting concrete utterances are used as training data.
+        Each template is expanded via the local
+        :func:`ovos_markov_pipeline._bracket_expansion.expand_template`
+        helper, and the resulting concrete utterances are used as training
+        data.
         """
         expanded: List[str] = []
         for s in samples:

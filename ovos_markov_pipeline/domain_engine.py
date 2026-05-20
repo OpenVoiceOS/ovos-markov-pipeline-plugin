@@ -160,18 +160,59 @@ class DomainMarkovIntentEngine:
 
     def calc_intents(self, query: str,
                       domain: Optional[str] = None,
-                      top_k_domains: int = 1) -> List[Tuple[str, float]]:
-        """Return ranked intents within the resolved (or top-k) domains."""
+                      top_k_domains: int = 1,
+                      blacklisted_intents: Optional[set] = None,
+                      blacklisted_skills: Optional[set] = None,
+                      ) -> List[Tuple[str, float]]:
+        """Return ranked intents within the resolved (or top-k) domains.
+
+        Accepts the same ``blacklisted_intents`` / ``blacklisted_skills``
+        kwargs as :meth:`MarkovIntentEngine.calc_intents` so this engine
+        is drop-in compatible with the flat :class:`MarkovPipeline`
+        scoring path.
+        """
         if self._needs_training:
             self.train()
+        sub_kwargs = dict(
+            blacklisted_intents=blacklisted_intents,
+            blacklisted_skills=blacklisted_skills,
+        )
         if domain:
             if domain in self.domains:
-                return self.domains[domain].calc_intents(query)
+                return self.domains[domain].calc_intents(query, **sub_kwargs)
             return []
-        domains = self.domain_engine.calc_intents(query)[:top_k_domains]
+        # Top-level routing ignores intent-level blacklists; per-domain
+        # sub-engines apply them.
+        domains = self.domain_engine.calc_intents(
+            query, blacklisted_skills=blacklisted_skills,
+        )[:top_k_domains]
         matches: List[Tuple[str, float]] = []
         for dom, _ in domains:
             if dom in self.domains:
-                matches.extend(self.domains[dom].calc_intents(query))
+                matches.extend(self.domains[dom].calc_intents(query, **sub_kwargs))
         matches.sort(key=lambda kv: kv[1], reverse=True)
         return matches
+
+    # ── parity with MarkovIntentEngine ─────────────────────────────────────
+
+    @property
+    def must_train(self) -> bool:
+        """Whether any sub-engine has pending samples to train on."""
+        if self._needs_training:
+            return True
+        if self.domain_engine.must_train:
+            return True
+        return any(sub.must_train for sub in self.domains.values())
+
+    @property
+    def _trained(self) -> bool:
+        """True once at least one sub-engine has been trained.
+
+        Mirrors :attr:`MarkovIntentEngine._trained` so the flat pipeline's
+        matching path treats this engine identically.
+        """
+        if self._needs_training:
+            return False
+        if not self.domains:
+            return False
+        return all(sub._trained for sub in self.domains.values())

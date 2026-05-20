@@ -26,6 +26,7 @@ test = ["pytest", "pytest-cov", "snowballstemmer"]
 
 [project.entry-points."opm.pipeline"]
 ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"
+ovos-markov-domain-pipeline-plugin = "ovos_markov_pipeline:DomainMarkovPipeline"
 
 [tool.setuptools.dynamic]
 version = { attr = "ovos_markov_pipeline.version.__version__" }

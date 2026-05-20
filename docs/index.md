@@ -39,12 +39,22 @@ utterance
 
 ## Package layout
 
-| Module           | Public API                                                        |
-| ---------------- | ------------------------------------------------------------------ |
-| `__init__.py`    | `MarkovPipeline` (OPM entry point), `MarkovIntentEngine`           |
-| `slots.py`       | `SlotExtractor` — HMM BIO entity extraction                        |
-| `cache.py`       | `IntentCache` — ONNX disk cache for trained models                 |
-| `calibration.py` | `evaluate()`, `find_optimal_thresholds()`                          |
+| Module             | Public API                                                                  |
+| ------------------ | --------------------------------------------------------------------------- |
+| `__init__.py`      | `MarkovPipeline`, `DomainMarkovPipeline` (OPM entry points), `MarkovIntentEngine` |
+| `domain_engine.py` | `DomainMarkovIntentEngine` — two-level domain → intent engine               |
+| `slots.py`         | `SlotExtractor` — HMM BIO entity extraction                                 |
+| `cache.py`         | `IntentCache` — ONNX disk cache for trained models                          |
+| `calibration.py`   | `evaluate()`, `find_optimal_thresholds()`                                   |
+
+## OPM entry points
+
+| Entry point | Class | Config key |
+|---|---|---|
+| `ovos-markov-pipeline-plugin` | `MarkovPipeline` | `intents.ovos-markov-pipeline-plugin` |
+| `ovos-markov-domain-pipeline-plugin` | `DomainMarkovPipeline` | `intents.ovos-markov-domain-pipeline-plugin` |
+
+See [Domain pipeline](domain_engine.md) for the hierarchical variant.
 
 ## Requirements
 

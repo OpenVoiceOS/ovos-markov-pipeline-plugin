@@ -441,18 +441,19 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                     except Exception:
                         pass
 
-        self.engines: Dict[str, MarkovIntentEngine] = {
-            lang: MarkovIntentEngine(
-                order=order,
-                smoothing=smoothing,
-                kneser_ney=kneser_ney,
-                backoff=backoff,
-                stemmer=self.stemmers.get(lang),
-                char_fallback=char_fallback,
-                char_fallback_threshold=char_fallback_threshold,
-            )
-            for lang in langs
+        # Stash engine kwargs so subclasses can re-use the same per-lang
+        # construction recipe via :meth:`_build_engines`.
+        self._engine_kwargs_template = {
+            "order": order,
+            "smoothing": smoothing,
+            "kneser_ney": kneser_ney,
+            "backoff": backoff,
+            "char_fallback": char_fallback,
+            "char_fallback_threshold": char_fallback_threshold,
         }
+        self._langs: List[str] = list(langs)
+
+        self.engines: Dict[str, MarkovIntentEngine] = self._build_engines()
 
         self.first_train = Event()
         self.finished_training_event = Event()
@@ -528,7 +529,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         closest = self._get_closest_lang(lang)
         if closest and closest in self.engines:
             LOG.debug(f"Registering markov intent: {name} ({len(samples)} samples)")
-            self.engines[closest].add_intent(name, samples)
+            self._add_intent(self.engines[closest], name, samples)
 
         if self.config.get("instant_train", False) or self.first_train.is_set():
             self.train(message)
@@ -539,18 +540,48 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         if intent_name and intent_name in self.registered_intents:
             self.registered_intents.remove(intent_name)
             for engine in self.engines.values():
-                engine.remove_intent(intent_name)
+                self._remove_intent(engine, intent_name)
 
     def handle_detach_skill(self, message: Message) -> None:
         """Remove all intents for a skill."""
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
         if not skill_id:
             return
-        for intent_name in self._skill2intent.pop(skill_id, []):
+        intent_names = self._skill2intent.pop(skill_id, [])
+        for intent_name in intent_names:
             if intent_name in self.registered_intents:
                 self.registered_intents.remove(intent_name)
-            for engine in self.engines.values():
-                engine.remove_intent(intent_name)
+        for engine in self.engines.values():
+            self._remove_skill(engine, skill_id, intent_names)
+
+    # ------------------------------------------------------------------
+    # Engine-shape hooks — overridden by DomainMarkovPipeline
+    # ------------------------------------------------------------------
+
+    def _build_engines(self) -> Dict[str, "MarkovIntentEngine"]:
+        """Construct one :class:`MarkovIntentEngine` per registered language."""
+        return {
+            lang: MarkovIntentEngine(
+                stemmer=self.stemmers.get(lang),
+                **self._engine_kwargs_template,
+            )
+            for lang in self._langs
+        }
+
+    def _add_intent(self, engine: "MarkovIntentEngine",
+                    name: str, samples: List[str]) -> None:
+        """Register *name* with *samples* in *engine*."""
+        engine.add_intent(name, samples)
+
+    def _remove_intent(self, engine: "MarkovIntentEngine", name: str) -> None:
+        """Remove a single intent from *engine*."""
+        engine.remove_intent(name)
+
+    def _remove_skill(self, engine: "MarkovIntentEngine",
+                      skill_id: str, intent_names: List[str]) -> None:
+        """Remove all intents owned by *skill_id* from *engine*."""
+        for name in intent_names:
+            engine.remove_intent(name)
 
     # -- Training -------------------------------------------------------------
 
@@ -677,3 +708,86 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
 # the other OVOS intent plugins (nebulento, ovos-padatious, palavreado,
 # padacioso, linha_fina).
 from ovos_markov_pipeline.domain_engine import DomainMarkovIntentEngine  # noqa: E402, F401
+
+
+class DomainMarkovPipeline(MarkovPipeline):
+    """Hierarchical, two-level Markov pipeline.
+
+    Same behaviour as :class:`MarkovPipeline` except the per-language
+    engine is a :class:`DomainMarkovIntentEngine`. Each Padatious intent
+    is routed to a domain == ``skill_id`` (taken from the intent label's
+    ``<skill_id>:<intent>`` prefix); inference first picks the most
+    likely domain via the top-level Markov classifier and then scores
+    intents only within that domain.
+
+    Configuration is read from
+    ``intents.ovos-markov-domain-pipeline-plugin`` so this pipeline can
+    coexist with the flat plugin in the same OVOS instance. Accepts
+    every key the flat plugin does.
+
+    Example ``mycroft.conf``::
+
+        "intents": {
+            "ovos-markov-domain-pipeline-plugin": {
+                "order": 2,
+                "kneser_ney": true,
+                "backoff": true,
+                "conf_high": 0.50,
+                "conf_med": 0.30,
+                "conf_low": 0.15,
+                "instant_train": true
+            }
+        }
+    """
+
+    def __init__(
+        self,
+        bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+        config: Optional[Dict] = None,
+    ) -> None:
+        if config is None:
+            intent_config = Configuration().get("intents", {})
+            config = (
+                intent_config.get("ovos-markov-domain-pipeline-plugin")
+                or intent_config.get("ovos_markov_domain_pipeline_plugin")
+                or {}
+            )
+        super().__init__(bus, config)
+
+    # ------------------------------------------------------------------
+    # Hook overrides — swap engine shape and route adds/removes by domain
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _domain_of(name: str) -> str:
+        """Extract the domain (skill_id) from a ``skill_id:intent`` label."""
+        return name.split(":", 1)[0] if ":" in name else name
+
+    def _build_engines(self) -> Dict[str, DomainMarkovIntentEngine]:
+        return {
+            lang: DomainMarkovIntentEngine(
+                stemmer=self.stemmers.get(lang),
+                **self._engine_kwargs_template,
+            )
+            for lang in self._langs
+        }
+
+    def _add_intent(self, engine: DomainMarkovIntentEngine,
+                    name: str, samples: List[str]) -> None:
+        engine.register_domain_intent(self._domain_of(name), name, samples)
+
+    def _remove_intent(self, engine: DomainMarkovIntentEngine,
+                       name: str) -> None:
+        engine.remove_domain_intent(self._domain_of(name), name)
+
+    def _remove_skill(self, engine: DomainMarkovIntentEngine,
+                      skill_id: str, intent_names: List[str]) -> None:
+        # In domain mode the skill_id IS the domain.
+        engine.remove_domain(skill_id)
+
+    # ------------------------------------------------------------------
+    # Override the manifest topic so the two pipelines have distinct queries.
+    # ------------------------------------------------------------------
+
+    def shutdown(self) -> None:  # noqa: D401 — inherits docstring
+        super().shutdown()

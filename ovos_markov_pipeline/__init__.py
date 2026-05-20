@@ -25,6 +25,7 @@ from ovos_plugin_manager.templates.pipeline import (
     ConfidenceMatcherPipeline,
     IntentHandlerMatch,
 )
+from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
@@ -145,8 +146,38 @@ class MarkovIntentEngine:
         return not self._trained and len(self._intent_samples) > 0
 
     def add_intent(self, name: str, samples: List[str]) -> None:
-        """Register an intent with training samples."""
-        cleaned = [s.strip() for s in samples if s.strip()]
+        """Register an intent with training samples.
+
+        Samples may use OVOS template syntax:
+            ``(a|b)``  alternatives
+            ``[opt]``  optional components
+            ``{slot}`` slot placeholders (kept verbatim as features)
+
+        Each template is expanded via
+        :func:`ovos_utils.bracket_expansion.expand_template`, and the
+        resulting concrete utterances are used as training data.
+        """
+        expanded: List[str] = []
+        for s in samples:
+            if not s or not s.strip():
+                continue
+            try:
+                for variant in expand_template(s):
+                    v = variant.strip()
+                    if v:
+                        expanded.append(v)
+            except Exception:
+                # Fall back to the raw sample if expansion fails for any reason
+                v = s.strip()
+                if v:
+                    expanded.append(v)
+        # Deduplicate while preserving order
+        seen = set()
+        cleaned: List[str] = []
+        for s in expanded:
+            if s not in seen:
+                seen.add(s)
+                cleaned.append(s)
         self._intent_samples[name] = cleaned
         self._trained = False
 

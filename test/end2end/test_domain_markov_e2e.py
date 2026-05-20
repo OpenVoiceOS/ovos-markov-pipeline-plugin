@@ -1,9 +1,9 @@
 """End-to-end tests for DomainMarkovPipeline.
 
-Drives a `MiniCroft` instance with the hierarchical domain entry point
+Drives a `MiniCroft` instance with the domain entry point
 (`ovos-markov-domain-pipeline-plugin`) and exercises the
-``padatious:register_intent`` → domain routing → utterance dispatch
-path against a :class:`DomainMarkovIntentEngine`.
+``padatious:register_intent`` → parallel-argmax scoring → utterance
+dispatch path against a :class:`DomainMarkovIntentEngine`.
 
 Skipped automatically if ``ovoscope`` is not installed.
 """
@@ -186,7 +186,7 @@ class TestDomainMatch(_DomainE2EBase):
                        ["play music", "start the music",
                         "put on some music"])
 
-    def test_router_picks_correct_domain(self):
+    def test_parallel_argmax_picks_correct_intent(self):
         self._seed()
         msg = self._send_and_capture(
             "turn on the lights",

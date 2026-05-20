@@ -3,7 +3,7 @@
 This page documents two layers that ship together:
 
 * **`DomainMarkovPipeline`** — the OPM-discoverable pipeline class. Entry point: `ovos-markov-domain-pipeline-plugin`. Subclasses the flat `MarkovPipeline`; the only differences are the per-language engine shape (below) and that intents are routed to a domain == `skill_id` at registration time.
-* **`DomainMarkovIntentEngine`** — the hierarchical, two-level variant of `MarkovIntentEngine` used internally by that pipeline.
+* **`DomainMarkovIntentEngine`** — the domain-aware variant of `MarkovIntentEngine` used internally by that pipeline.
 
 A separate entry point (rather than a `domain_engine: true` config flag on the flat pipeline) keeps the two pipelines independently selectable in `default_pipeline` ordering and lets each have its own `intents.<key>` config block.
 
@@ -29,7 +29,7 @@ Add it to your OVOS config and place it in your pipeline order alongside (or in 
 }
 ```
 
-Configuration keys are read from `intents.ovos-markov-domain-pipeline-plugin`. The pipeline accepts every key the flat plugin does — the per-language sub-engines inherit the same `order`, smoothing, stemmer, and char-fallback settings.
+Configuration keys are read from `intents.ovos-markov-domain-pipeline-plugin`. The pipeline accepts every key the flat plugin does — the per-domain sub-engines inherit the same `order`, smoothing, stemmer, and char-fallback settings.
 
 Pipeline order entries follow the standard confidence-tier naming:
 
@@ -39,16 +39,16 @@ Pipeline order entries follow the standard confidence-tier naming:
 "ovos-markov-domain-pipeline-plugin-low"
 ```
 
-## Hierarchical engine
+## Domain engine
 
-`DomainMarkovIntentEngine` is the hierarchical variant of `MarkovIntentEngine`. Intents are grouped into *domains*, and at inference time the engine first picks the most likely domain, then scores intents only within that domain. This mirrors the API shipped by sibling OVOS intent plugins (`nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, `linha_fina.DomainIntentEngine`, `ovos_m2v_pipeline.DomainPrototypeIntentStore`).
+`DomainMarkovIntentEngine` groups intents into *domains*, each owning its own `MarkovIntentEngine`. There is no top-level router — at query time every domain scores the utterance independently and the global argmax wins. This mirrors the parallel-argmax pattern used by `adapt` and the other OVOS intent plugins (`nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, `linha_fina.DomainIntentEngine`, `ovos_m2v_pipeline.DomainPrototypeIntentStore`).
 
-## Why hierarchical
+## Why a domain layout
 
-Two-level matching gives the perplexity paradigm two concrete benefits:
+Even without a router, organising intents into domains pays off for the perplexity paradigm:
 
-1. **Sharper per-domain perplexities.** A domain's intents share a vocabulary subspace (lights / thermostat / door all share "smarthome" surface forms), so the perplexity gap across the sub-engine's intents is more discriminative than the global gap over every registered intent.
-2. **Lower far-OOD false-positive rate.** The top-level Markov classifier rejects chitchat that doesn't strongly match any domain *before* any sub-engine sees it.
+1. **Sharper per-domain perplexities.** A domain's intents share a vocabulary subspace (lights / thermostat / door all share "smarthome" surface forms), so per-domain Markov chains use denser, more discriminative count tables than a single global model.
+2. **Cheap pre-pruning.** Each domain has a small word-vocabulary set; if the utterance shares no tokens with a domain's vocabulary, that sub-engine is skipped entirely. With many registered skills this prunes the vast majority of domains on a typical utterance.
 
 ## Architecture
 
@@ -56,35 +56,35 @@ Two-level matching gives the perplexity paradigm two concrete benefits:
               utterance
                  │
                  ▼
-       ┌───────────────────────┐
-       │   domain_engine       │   MarkovIntentEngine
-       │   (router)            │   one chain per domain
-       └───────────────────────┘
+       ┌───────────────────────────────┐
+       │ vocab-overlap pre-filter      │   in-memory set check
+       │  (+ optional top_k_domains)   │
+       └───────────────────────────────┘
                  │
-            best domain
+        candidate domains
                  │
                  ▼
-       ┌───────────────────────┐
-       │   domains[<skill_id>] │   MarkovIntentEngine
-       │   (intent matcher)    │   one chain per intent
-       └───────────────────────┘
+       ┌───────────────────────────────┐
+       │ domains[d].calc_intents(utt)  │   parallel per-domain scoring
+       │   for d in candidates         │
+       └───────────────────────────────┘
                  │
+       flatten + sort by confidence
+                 │
+                 ▼
          [(label, conf), …]
 ```
 
-Every `padatious:register_intent` event with name `<skill_id>:<intent>` triggers:
-
-* `engine.register_domain_intent(skill_id, "<skill_id>:<intent>", samples)` on the per-language `DomainMarkovIntentEngine`.
-* On `train()`, the top-level `domain_engine` is auto-seeded with the concatenated samples of every intent in each domain (unless seeded explicitly via `engine.domain_engine.add_intent(...)` first).
+Every `padatious:register_intent` event with name `<skill_id>:<intent>` triggers `engine.register_domain_intent(skill_id, "<skill_id>:<intent>", samples)` on the per-language `DomainMarkovIntentEngine`. `train()` trains each sub-engine independently — there is no router to seed.
 
 `detach_intent` and `detach_skill` route through the same per-domain pathway: a `detach_skill` for `<skill_id>` drops the whole `<skill_id>` domain from every language engine in one call.
 
-## Hierarchical routing rules
+## Routing rules
 
 * Intent label must be of the form `<skill_id>:<intent>`. The portion before the first `:` is the domain.
 * Labels without a `:` use the whole name as the domain (a single-intent domain).
-* `detach_skill` drops the entire `<skill_id>` domain (router entry + sub-engine).
-* `detach_intent` drops a single label from its domain's sub-engine; the domain entry in the router is recomputed on the next `train()`.
+* `detach_skill` drops the entire `<skill_id>` domain.
+* `detach_intent` drops a single label from its domain's sub-engine.
 
 ## Usage
 
@@ -107,19 +107,23 @@ scores = d.calc_intents("turn on the lights")
 # scores → [("home:lights_on", 0.71), …]
 ```
 
-### Bypassing the router
+### Restricting to a single domain
 
-Pass `domain=...` to `calc_intent` / `calc_intents` to skip the top-level classifier and score directly inside a specific domain:
+Pass `domain=...` to `calc_intent` / `calc_intents` to score only inside a specific domain:
 
 ```python
 d.calc_intent("play africa", domain="media")
 ```
 
-### Inspecting the resolved domain
+### Pre-pruning hint
+
+For very large deployments you can pass `top_k_domains=K` to restrict scoring to the K domains with the highest fingerprint score (median per-intent confidence) after the vocabulary-overlap filter:
 
 ```python
-d.calc_domains("lights on")  # → [("home", 0.83), ("media", 0.21)]
+d.calc_intents("turn on the lights", top_k_domains=8)
 ```
+
+The default (`None`) scores every candidate domain that passes the vocabulary-overlap filter.
 
 ## See also
 

@@ -42,7 +42,7 @@ utterance
 | Module             | Public API                                                                  |
 | ------------------ | --------------------------------------------------------------------------- |
 | `__init__.py`      | `MarkovPipeline`, `DomainMarkovPipeline` (OPM entry points), `MarkovIntentEngine` |
-| `domain_engine.py` | `DomainMarkovIntentEngine` — two-level domain → intent engine               |
+| `domain_engine.py` | `DomainMarkovIntentEngine` — domain-grouped parallel-argmax engine          |
 | `slots.py`         | `SlotExtractor` — HMM BIO entity extraction                                 |
 | `cache.py`         | `IntentCache` — ONNX disk cache for trained models                          |
 | `calibration.py`   | `evaluate()`, `find_optimal_thresholds()`                                   |
@@ -54,7 +54,7 @@ utterance
 | `ovos-markov-pipeline-plugin` | `MarkovPipeline` | `intents.ovos-markov-pipeline-plugin` |
 | `ovos-markov-domain-pipeline-plugin` | `DomainMarkovPipeline` | `intents.ovos-markov-domain-pipeline-plugin` |
 
-See [Domain pipeline](domain_engine.md) for the hierarchical variant.
+See [Domain pipeline](domain_engine.md) for the domain-grouped variant.
 
 ## Requirements
 

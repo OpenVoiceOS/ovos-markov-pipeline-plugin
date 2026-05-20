@@ -1,35 +1,35 @@
-"""Domain-aware Markov intent engine for hierarchical intent organisation.
+"""Domain-aware Markov intent engine with parallel argmax scoring.
 
-Mirrors the API shipped by sibling OVOS intent plugins (`nebulento`,
-`ovos_padatious`, `palavreado`, `padacioso`, `linha_fina`): intents are
-grouped into *domains*, a top-level :class:`MarkovIntentEngine` first
-picks the domain, and the domain's sub-engine resolves the intent.
+Intents are grouped into *domains*, but there is no top-level domain
+classifier. Each Markov chain already produces a perplexity-derived
+per-intent confidence; at query time the engine scores every intent
+across every domain and returns the global argmax. This mirrors the
+parallel-argmax pattern used by adapt and the other OVOS intent
+plugins.
 
-For a Markov n-gram model, the top-level domain classifier is itself
-just another :class:`MarkovIntentEngine` trained with one Markov chain
-per domain (seeded with the concatenated utterances of every intent in
-the domain). The per-domain sub-engines then score only against the
-intents within their domain — a smaller, denser context-vocabulary that
-tightens perplexity-derived confidences and reduces cross-domain
-collisions.
+For Markov chains, per-intent scoring is cheap, so the only real
+optimisation is to skip a sub-engine whose vocabulary has zero overlap
+with the utterance tokens (a quick in-memory set check that prunes the
+vast majority of domains in large deployments).
 """
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
-from ovos_markov_pipeline import MarkovIntentEngine
+from ovos_markov_pipeline import MarkovIntentEngine, _normalize
 
 
 class DomainMarkovIntentEngine:
-    """Two-level Markov intent engine: domain classification followed by intent matching.
+    """Parallel-argmax Markov intent engine.
 
-    Intents are grouped into *domains*. At query time the engine first
-    selects the most likely domain via :attr:`domain_engine`, then runs
-    the domain-specific :class:`MarkovIntentEngine` to find the best
-    intent within that domain.
+    Intents are grouped into *domains*. Each domain owns its own
+    :class:`MarkovIntentEngine`. There is no top-level router: at query
+    time every domain scores the utterance and the global highest-
+    confidence intent wins.
 
-    Domains can also be selected explicitly, bypassing the top-level
-    classifier.
+    Domains can still be selected explicitly via the ``domain`` kwarg
+    on :meth:`calc_intent` / :meth:`calc_intents`, in which case only
+    that domain's intents are scored.
 
     Example::
 
@@ -43,22 +43,16 @@ class DomainMarkovIntentEngine:
         d.register_domain_intent("home", "lights_on",
                                   ["turn on the lights", "lights on"])
 
-        # Seed the domain classifier with representative samples per domain.
-        d.domain_engine.add_intent("media", ["play music", "next track"])
-        d.domain_engine.add_intent("home",  ["lights on", "thermostat"])
-
         d.train()
         name, conf = d.calc_intent("play africa")
         # name == "play"
 
     All constructor kwargs are forwarded to every internal
-    :class:`MarkovIntentEngine` instance (top-level and per-domain).
+    :class:`MarkovIntentEngine` instance.
     """
 
     def __init__(self, **engine_kwargs) -> None:
         self._engine_kwargs = dict(engine_kwargs)
-        #: Top-level classifier that maps queries to a domain name.
-        self.domain_engine: MarkovIntentEngine = MarkovIntentEngine(**self._engine_kwargs)
         #: Per-domain intent engines, keyed by domain name.
         self.domains: Dict[str, MarkovIntentEngine] = {}
         #: Raw training samples per (domain, intent).
@@ -71,10 +65,6 @@ class DomainMarkovIntentEngine:
         """Remove a domain and all its intents and training data."""
         self.training_data.pop(domain_name, None)
         self.domains.pop(domain_name, None)
-        try:
-            self.domain_engine.remove_intent(domain_name)
-        except Exception:
-            pass
 
     # ── intent management ──────────────────────────────────────────────────
 
@@ -105,34 +95,69 @@ class DomainMarkovIntentEngine:
     # ── training ───────────────────────────────────────────────────────────
 
     def train(self) -> None:
-        """Train every internal engine.
-
-        If the top-level :attr:`domain_engine` has not been seeded
-        explicitly (no calls to ``domain_engine.add_intent`` before this
-        method runs), this method seeds it automatically using the
-        concatenated samples of every intent within each domain.
-        """
-        # Auto-seed domain engine if not seeded already.
-        already_seeded = bool(getattr(self.domain_engine, "_intent_samples", None))
-        if not already_seeded:
-            for domain, intents in self.training_data.items():
-                samples: List[str] = []
-                for sents in intents.values():
-                    samples.extend(sents)
-                if samples:
-                    self.domain_engine.add_intent(domain, samples)
-        self.domain_engine.train()
+        """Train every per-domain sub-engine."""
         for sub in self.domains.values():
-            sub.train()
+            if sub.must_train:
+                sub.train()
         self._needs_training = False
 
-    # ── query API ──────────────────────────────────────────────────────────
+    # ── optimisation helpers ───────────────────────────────────────────────
 
-    def calc_domains(self, query: str) -> List[Tuple[str, float]]:
-        """Return the top scoring domains for *query* with confidences."""
-        if self._needs_training:
-            self.train()
-        return self.domain_engine.calc_intents(query)
+    def _domain_vocab(self, domain_name: str) -> Set[str]:
+        """Return the set of word tokens seen in a domain's training data.
+
+        Used as a cheap pre-filter: if the utterance shares no tokens
+        with a domain's vocabulary, scoring its sub-engine cannot
+        possibly yield a non-trivial confidence.
+        """
+        stemmer = self._engine_kwargs.get("stemmer")
+        vocab: Set[str] = set()
+        for samples in self.training_data.get(domain_name, {}).values():
+            for s in samples:
+                norm = _normalize(s, stemmer)
+                vocab.update(norm.split())
+        return vocab
+
+    def _candidate_domains(self, query: str,
+                            top_k_domains: Optional[int] = None,
+                            ) -> List[str]:
+        """Pre-filter domains worth scoring for *query*.
+
+        Drops domains whose vocabulary has no overlap with the
+        utterance tokens. If ``top_k_domains`` is set, further restricts
+        to the K domains with the highest median per-intent score on
+        the utterance (a coarse fingerprint score).
+        """
+        stemmer = self._engine_kwargs.get("stemmer")
+        norm = _normalize(query, stemmer)
+        utt_tokens = set(norm.split())
+
+        candidates: List[str] = []
+        for dom in self.domains:
+            vocab = self._domain_vocab(dom)
+            if vocab and utt_tokens.isdisjoint(vocab):
+                continue
+            candidates.append(dom)
+
+        if top_k_domains is None or len(candidates) <= top_k_domains:
+            return candidates
+
+        # Coarse domain-fingerprint: median per-intent confidence across
+        # the domain's intents. Used only to pre-prune when the caller
+        # passes top_k_domains as a hint.
+        scored: List[Tuple[str, float]] = []
+        for dom in candidates:
+            scores = self.domains[dom].calc_intents(query)
+            if not scores:
+                scored.append((dom, 0.0))
+                continue
+            confs = sorted(c for _, c in scores)
+            median = confs[len(confs) // 2]
+            scored.append((dom, median))
+        scored.sort(key=lambda kv: kv[1], reverse=True)
+        return [d for d, _ in scored[:top_k_domains]]
+
+    # ── query API ──────────────────────────────────────────────────────────
 
     def calc_intent(self, query: str,
                      domain: Optional[str] = None) -> Optional[Tuple[str, float]]:
@@ -140,56 +165,54 @@ class DomainMarkovIntentEngine:
 
         Args:
             query: The utterance to match.
-            domain: If given, skip the top-level classifier and resolve
-                the intent inside this domain directly.
+            domain: If given, restrict scoring to this domain.
 
         Returns:
-            ``(intent_name, conf)`` from the chosen domain's engine, or
-            ``None`` if no domain or intent matched.
+            ``(intent_name, conf)`` for the global argmax across all
+            scored domains, or ``None`` if nothing matched.
         """
-        if self._needs_training:
-            self.train()
-        resolved_domain: Optional[str] = domain
-        if resolved_domain is None:
-            top = self.domain_engine.calc_intents(query)
-            resolved_domain = top[0][0] if top else None
-        if not resolved_domain or resolved_domain not in self.domains:
-            return None
-        scores = self.domains[resolved_domain].calc_intents(query)
+        scores = self.calc_intents(query, domain=domain)
         return scores[0] if scores else None
 
     def calc_intents(self, query: str,
                       domain: Optional[str] = None,
-                      top_k_domains: int = 1,
+                      top_k_domains: Optional[int] = None,
                       blacklisted_intents: Optional[set] = None,
                       blacklisted_skills: Optional[set] = None,
                       ) -> List[Tuple[str, float]]:
-        """Return ranked intents within the resolved (or top-k) domains.
+        """Return ranked intents across every (candidate) domain.
 
-        Accepts the same ``blacklisted_intents`` / ``blacklisted_skills``
-        kwargs as :meth:`MarkovIntentEngine.calc_intents` so this engine
-        is drop-in compatible with the flat :class:`MarkovPipeline`
-        scoring path.
+        Each sub-engine scores the utterance independently; results are
+        flattened and sorted by confidence descending. Equivalent to
+        the parallel-argmax pattern used by adapt.
+
+        Args:
+            query: The utterance to match.
+            domain: If given, score only inside this domain.
+            top_k_domains: Optional pre-pruning hint; restrict scoring
+                to the top-K domains by domain-fingerprint score. Pass
+                ``None`` (default) to score every candidate domain.
+            blacklisted_intents: Intent labels to skip.
+            blacklisted_skills: Skill IDs (label prefix before ``:``)
+                to skip.
         """
         if self._needs_training:
             self.train()
+
         sub_kwargs = dict(
             blacklisted_intents=blacklisted_intents,
             blacklisted_skills=blacklisted_skills,
         )
-        if domain:
-            if domain in self.domains:
-                return self.domains[domain].calc_intents(query, **sub_kwargs)
-            return []
-        # Top-level routing ignores intent-level blacklists; per-domain
-        # sub-engines apply them.
-        domains = self.domain_engine.calc_intents(
-            query, blacklisted_skills=blacklisted_skills,
-        )[:top_k_domains]
+
+        if domain is not None:
+            if domain not in self.domains:
+                return []
+            return self.domains[domain].calc_intents(query, **sub_kwargs)
+
+        candidates = self._candidate_domains(query, top_k_domains=top_k_domains)
         matches: List[Tuple[str, float]] = []
-        for dom, _ in domains:
-            if dom in self.domains:
-                matches.extend(self.domains[dom].calc_intents(query, **sub_kwargs))
+        for dom in candidates:
+            matches.extend(self.domains[dom].calc_intents(query, **sub_kwargs))
         matches.sort(key=lambda kv: kv[1], reverse=True)
         return matches
 
@@ -200,17 +223,11 @@ class DomainMarkovIntentEngine:
         """Whether any sub-engine has pending samples to train on."""
         if self._needs_training:
             return True
-        if self.domain_engine.must_train:
-            return True
         return any(sub.must_train for sub in self.domains.values())
 
     @property
     def _trained(self) -> bool:
-        """True once at least one sub-engine has been trained.
-
-        Mirrors :attr:`MarkovIntentEngine._trained` so the flat pipeline's
-        matching path treats this engine identically.
-        """
+        """True once every sub-engine has been trained."""
         if self._needs_training:
             return False
         if not self.domains:

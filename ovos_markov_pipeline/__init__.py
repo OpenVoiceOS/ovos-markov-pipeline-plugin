@@ -711,14 +711,14 @@ from ovos_markov_pipeline.domain_engine import DomainMarkovIntentEngine  # noqa:
 
 
 class DomainMarkovPipeline(MarkovPipeline):
-    """Hierarchical, two-level Markov pipeline.
+    """Domain-grouped Markov pipeline with parallel-argmax scoring.
 
     Same behaviour as :class:`MarkovPipeline` except the per-language
     engine is a :class:`DomainMarkovIntentEngine`. Each Padatious intent
-    is routed to a domain == ``skill_id`` (taken from the intent label's
-    ``<skill_id>:<intent>`` prefix); inference first picks the most
-    likely domain via the top-level Markov classifier and then scores
-    intents only within that domain.
+    is grouped under a domain == ``skill_id`` (taken from the intent
+    label's ``<skill_id>:<intent>`` prefix); inference scores every
+    domain's intents in parallel (after a cheap vocabulary-overlap
+    pre-filter) and returns the global argmax.
 
     Configuration is read from
     ``intents.ovos-markov-domain-pipeline-plugin`` so this pipeline can

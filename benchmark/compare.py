@@ -140,7 +140,6 @@ def print_report(label, results, cases, latencies, train_ms=None):
     s = sorted(latencies)
     m05 = compute_metrics(results, cases, THRESHOLD)
     bf1, bthr, mb = best_f1(results, cases)
-    total = m05["match_n"] + m05["nomatch_n"]
     print(f"{'=' * 64}")
     print(f"  {label}")
     print(f"{'=' * 64}")

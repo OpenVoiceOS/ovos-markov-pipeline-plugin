@@ -9,3 +9,7 @@ jobs:
   license_check:
     uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
     secrets: inherit
+    with:
+      # The package under test is installed editable; its own dist has no
+      # resolvable license metadata for the checker. Audit dependencies only.
+      exclude_packages: '^ovos-markov-pipeline-plugin$'

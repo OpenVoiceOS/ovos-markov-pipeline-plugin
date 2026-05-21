@@ -118,15 +118,11 @@ class DomainMarkovIntentEngine:
                 vocab.update(norm.split())
         return vocab
 
-    def _candidate_domains(self, query: str,
-                            top_k_domains: Optional[int] = None,
-                            ) -> List[str]:
+    def _candidate_domains(self, query: str) -> List[str]:
         """Pre-filter domains worth scoring for *query*.
 
         Drops domains whose vocabulary has no overlap with the
-        utterance tokens. If ``top_k_domains`` is set, further restricts
-        to the K domains with the highest median per-intent score on
-        the utterance (a coarse fingerprint score).
+        utterance tokens.
         """
         stemmer = self._engine_kwargs.get("stemmer")
         norm = _normalize(query, stemmer)
@@ -138,24 +134,7 @@ class DomainMarkovIntentEngine:
             if vocab and utt_tokens.isdisjoint(vocab):
                 continue
             candidates.append(dom)
-
-        if top_k_domains is None or len(candidates) <= top_k_domains:
-            return candidates
-
-        # Coarse domain-fingerprint: median per-intent confidence across
-        # the domain's intents. Used only to pre-prune when the caller
-        # passes top_k_domains as a hint.
-        scored: List[Tuple[str, float]] = []
-        for dom in candidates:
-            scores = self.domains[dom].calc_intents(query)
-            if not scores:
-                scored.append((dom, 0.0))
-                continue
-            confs = sorted(c for _, c in scores)
-            median = confs[len(confs) // 2]
-            scored.append((dom, median))
-        scored.sort(key=lambda kv: kv[1], reverse=True)
-        return [d for d, _ in scored[:top_k_domains]]
+        return candidates
 
     # ── query API ──────────────────────────────────────────────────────────
 
@@ -176,7 +155,6 @@ class DomainMarkovIntentEngine:
 
     def calc_intents(self, query: str,
                       domain: Optional[str] = None,
-                      top_k_domains: Optional[int] = None,
                       blacklisted_intents: Optional[set] = None,
                       blacklisted_skills: Optional[set] = None,
                       ) -> List[Tuple[str, float]]:
@@ -189,9 +167,6 @@ class DomainMarkovIntentEngine:
         Args:
             query: The utterance to match.
             domain: If given, score only inside this domain.
-            top_k_domains: Optional pre-pruning hint; restrict scoring
-                to the top-K domains by domain-fingerprint score. Pass
-                ``None`` (default) to score every candidate domain.
             blacklisted_intents: Intent labels to skip.
             blacklisted_skills: Skill IDs (label prefix before ``:``)
                 to skip.
@@ -209,7 +184,7 @@ class DomainMarkovIntentEngine:
                 return []
             return self.domains[domain].calc_intents(query, **sub_kwargs)
 
-        candidates = self._candidate_domains(query, top_k_domains=top_k_domains)
+        candidates = self._candidate_domains(query)
         matches: List[Tuple[str, float]] = []
         for dom in candidates:
             matches.extend(self.domains[dom].calc_intents(query, **sub_kwargs))

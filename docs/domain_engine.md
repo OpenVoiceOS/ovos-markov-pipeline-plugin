@@ -33,7 +33,7 @@ Configuration keys are read from `intents.ovos-markov-domain-pipeline-plugin`. T
 
 Pipeline order entries follow the standard confidence-tier naming:
 
-```
+```text
 "ovos-markov-domain-pipeline-plugin-high",
 "ovos-markov-domain-pipeline-plugin-medium",
 "ovos-markov-domain-pipeline-plugin-low"
@@ -52,13 +52,12 @@ Even without a router, organising intents into domains pays off for the perplexi
 
 ## Architecture
 
-```
+```text
               utterance
                  │
                  ▼
        ┌───────────────────────────────┐
        │ vocab-overlap pre-filter      │   in-memory set check
-       │  (+ optional top_k_domains)   │
        └───────────────────────────────┘
                  │
         candidate domains
@@ -114,16 +113,6 @@ Pass `domain=...` to `calc_intent` / `calc_intents` to score only inside a speci
 ```python
 d.calc_intent("play africa", domain="media")
 ```
-
-### Pre-pruning hint
-
-For very large deployments you can pass `top_k_domains=K` to restrict scoring to the K domains with the highest fingerprint score (median per-intent confidence) after the vocabulary-overlap filter:
-
-```python
-d.calc_intents("turn on the lights", top_k_domains=8)
-```
-
-The default (`None`) scores every candidate domain that passes the vocabulary-overlap filter.
 
 ## See also
 

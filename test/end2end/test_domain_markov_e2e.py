@@ -124,9 +124,7 @@ class TestDomainPipelineLoad(_DomainE2EBase):
 
     def test_flat_engine_is_separate_class(self):
         for engine in self.pipeline.engines.values():
-            # It must not be the flat engine.
-            self.assertNotIsInstance(engine, MarkovIntentEngine.__mro__[0]
-                                     if False else type(None))
+            self.assertIsNot(type(engine), MarkovIntentEngine)
             self.assertIsInstance(engine, DomainMarkovIntentEngine)
 
 

@@ -784,10 +784,3 @@ class DomainMarkovPipeline(MarkovPipeline):
                       skill_id: str, intent_names: List[str]) -> None:
         # In domain mode the skill_id IS the domain.
         engine.remove_domain(skill_id)
-
-    # ------------------------------------------------------------------
-    # Override the manifest topic so the two pipelines have distinct queries.
-    # ------------------------------------------------------------------
-
-    def shutdown(self) -> None:  # noqa: D401 — inherits docstring
-        super().shutdown()

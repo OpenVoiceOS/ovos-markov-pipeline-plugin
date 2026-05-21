@@ -12,4 +12,4 @@ jobs:
     with:
       # The package under test is installed editable; its own dist has no
       # resolvable license metadata for the checker. Audit dependencies only.
-      exclude_packages: '^ovos-markov-pipeline-plugin$'
+      exclude_packages: '^ovos-markov-pipeline-plugin.*'

@@ -70,7 +70,7 @@ def test_calc_intents_too_short_returns_empty():
 
 def test_update_online_unknown_intent_noop():
     engine = _weather_timer_engine()
-    before = dict(engine._intent_samples)
+    before = {k: list(v) for k, v in engine._intent_samples.items()}
     engine.update_online("does-not-exist", "some utterance")
     assert engine._intent_samples == before
 
@@ -78,6 +78,7 @@ def test_update_online_unknown_intent_noop():
 def test_update_online_appends_and_retrains():
     engine = _weather_timer_engine()
     n_before = len(engine._intent_samples["weather"])
+    engine._trained = False
     engine.update_online("weather", "how is the weather outside")
     assert len(engine._intent_samples["weather"]) == n_before + 1
     assert engine._trained

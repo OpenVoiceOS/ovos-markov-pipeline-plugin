@@ -42,7 +42,7 @@ utterance
 | Module             | Public API                                                                  |
 | ------------------ | --------------------------------------------------------------------------- |
 | `__init__.py`      | `MarkovPipeline`, `DomainMarkovPipeline` (OPM entry points), `MarkovIntentEngine` |
-| `domain_engine.py` | `DomainMarkovIntentEngine` — domain-grouped parallel-argmax engine          |
+| `domain_engine.py` | `DomainMarkovIntentEngine` — two-stage router → intent engine                |
 | `slots.py`         | `SlotExtractor` — HMM BIO entity extraction                                 |
 | `cache.py`         | `IntentCache` — ONNX disk cache for trained models                          |
 | `calibration.py`   | `evaluate()`, `find_optimal_thresholds()`                                   |

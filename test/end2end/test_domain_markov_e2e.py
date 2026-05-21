@@ -2,7 +2,7 @@
 
 Drives a `MiniCroft` instance with the domain entry point
 (`ovos-markov-domain-pipeline-plugin`) and exercises the
-``padatious:register_intent`` → parallel-argmax scoring → utterance
+``padatious:register_intent`` → two-stage routing → utterance
 dispatch path against a :class:`DomainMarkovIntentEngine`.
 
 Skipped automatically if ``ovoscope`` is not installed.
@@ -184,7 +184,7 @@ class TestDomainMatch(_DomainE2EBase):
                        ["play music", "start the music",
                         "put on some music"])
 
-    def test_parallel_argmax_picks_correct_intent(self):
+    def test_router_picks_correct_intent(self):
         self._seed()
         msg = self._send_and_capture(
             "turn on the lights",

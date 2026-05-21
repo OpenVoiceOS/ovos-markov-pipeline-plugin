@@ -41,14 +41,20 @@ Pipeline order entries follow the standard confidence-tier naming:
 
 ## Domain engine
 
-`DomainMarkovIntentEngine` groups intents into *domains*, each owning its own `MarkovIntentEngine`. There is no top-level router — at query time every domain scores the utterance independently and the global argmax wins. This mirrors the parallel-argmax pattern used by `adapt` and the other OVOS intent plugins (`nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, `linha_fina.DomainIntentEngine`, `ovos_m2v_pipeline.DomainPrototypeIntentStore`).
+`DomainMarkovIntentEngine` groups intents into *domains*, each owning its own `MarkovIntentEngine`. A top-level **router** — itself a `MarkovIntentEngine` whose "intents" are the domains — first picks the most likely domain for an utterance; that domain's sub-engine then resolves the concrete intent. This mirrors the two-stage domain → intent model used by the other OVOS intent plugins (`nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, `linha_fina.DomainIntentEngine`).
 
-## Why a domain layout
+## Why a router
 
-Even without a router, organising intents into domains pays off for the perplexity paradigm:
+A `MarkovIntentEngine` builds **one shared vocabulary** from the union of its intents' samples. Perplexity — and the confidence derived from it — is only calibrated against intents trained on that same vocabulary.
 
-1. **Sharper per-domain perplexities.** A domain's intents share a vocabulary subspace (lights / thermostat / door all share "smarthome" surface forms), so per-domain Markov chains use denser, more discriminative count tables than a single global model.
-2. **Cheap pre-pruning.** Each domain has a small word-vocabulary set; if the utterance shares no tokens with a domain's vocabulary, that sub-engine is skipped entirely. With many registered skills this prunes the vast majority of domains on a typical utterance.
+If every domain sub-engine scored the utterance independently and a flat global argmax picked the winner, it would be comparing confidences computed against **different-sized vocabularies** (each domain's own). That is not a valid ranking — a domain with a smaller vocabulary gets a systematic confidence bias.
+
+Two-stage routing keeps every comparison within a single vocabulary:
+
+1. **Routing stage** — the router scores the utterance against each domain. Every domain is one router "intent" trained on the concatenation of that domain's intent samples, so all domains share the router's (global) vocabulary and rank consistently.
+2. **Resolution stage** — only the routed domain's sub-engine runs. Its intents all share that domain's vocabulary, so their confidences rank consistently.
+
+The returned confidences therefore always come from a single sub-engine over a single vocabulary.
 
 ## Architecture
 
@@ -57,24 +63,23 @@ Even without a router, organising intents into domains pays off for the perplexi
                  │
                  ▼
        ┌───────────────────────────────┐
-       │ vocab-overlap pre-filter      │   in-memory set check
+       │ domain_engine.calc_intent()   │   router — one MarkovChain
+       │   (router)                    │   per domain, shared vocab
        └───────────────────────────────┘
                  │
-        candidate domains
+            best domain
                  │
                  ▼
        ┌───────────────────────────────┐
-       │ domains[d].calc_intents(utt)  │   parallel per-domain scoring
-       │   for d in candidates         │
+       │ domains[d].calc_intents(utt)  │   resolve the intent inside
+       │   (intent matcher)            │   the routed domain
        └───────────────────────────────┘
-                 │
-       flatten + sort by confidence
                  │
                  ▼
          [(label, conf), …]
 ```
 
-Every `padatious:register_intent` event with name `<skill_id>:<intent>` triggers `engine.register_domain_intent(skill_id, "<skill_id>:<intent>", samples)` on the per-language `DomainMarkovIntentEngine`. `train()` trains each sub-engine independently — there is no router to seed.
+Every `padatious:register_intent` event with name `<skill_id>:<intent>` triggers `engine.register_domain_intent(skill_id, "<skill_id>:<intent>", samples)` on the per-language `DomainMarkovIntentEngine`. `train()` rebuilds the router from the current domains (so removed domains drop out) and trains every sub-engine.
 
 `detach_intent` and `detach_skill` route through the same per-domain pathway: a `detach_skill` for `<skill_id>` drops the whole `<skill_id>` domain from every language engine in one call.
 
@@ -108,7 +113,7 @@ scores = d.calc_intents("turn on the lights")
 
 ### Restricting to a single domain
 
-Pass `domain=...` to `calc_intent` / `calc_intents` to score only inside a specific domain:
+Pass `domain=...` to `calc_intent` / `calc_intents` to bypass the router and resolve directly inside a specific domain:
 
 ```python
 d.calc_intent("play africa", domain="media")

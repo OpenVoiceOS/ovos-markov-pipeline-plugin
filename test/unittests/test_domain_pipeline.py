@@ -89,5 +89,47 @@ class TestDomainPipelineRouting(unittest.TestCase):
         self.assertTrue(self.engine._trained)
 
 
+class TestDomainEngineRouting(unittest.TestCase):
+    """Direct tests of the DomainMarkovIntentEngine router."""
+
+    def _engine(self) -> DomainMarkovIntentEngine:
+        d = DomainMarkovIntentEngine(order=1, kneser_ney=False, backoff=False)
+        d.register_domain_intent(
+            "home", "home:lights_on",
+            ["turn on the lights", "lights on please", "switch on the lights"])
+        d.register_domain_intent(
+            "media", "media:play",
+            ["play some music", "put on a song", "start the music"])
+        d.train()
+        return d
+
+    def test_routes_to_correct_domain_intent(self):
+        d = self._engine()
+        name, conf = d.calc_intent("turn on the lights")
+        self.assertEqual(name, "home:lights_on")
+        name, conf = d.calc_intent("play some music")
+        self.assertEqual(name, "media:play")
+
+    def test_results_come_from_one_domain(self):
+        # Every returned label must belong to the single routed domain.
+        d = self._engine()
+        scores = d.calc_intents("turn on the lights")
+        self.assertTrue(scores)
+        domains = {label.split(":", 1)[0] for label, _ in scores}
+        self.assertEqual(len(domains), 1)
+
+    def test_explicit_domain_bypasses_router(self):
+        d = self._engine()
+        scores = d.calc_intents("turn on the lights", domain="media")
+        self.assertTrue(all(lbl.startswith("media:") for lbl, _ in scores))
+
+    def test_remove_domain_drops_from_router(self):
+        d = self._engine()
+        d.remove_domain("media")
+        d.train()
+        self.assertNotIn("media", d.domain_engine._intent_samples)
+        self.assertNotIn("media", d.domains)
+
+
 if __name__ == "__main__":
     unittest.main()

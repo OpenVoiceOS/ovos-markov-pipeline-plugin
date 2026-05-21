@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 stem = ["snowballstemmer"]
 test = ["pytest", "pytest-cov", "snowballstemmer"]
+benchmark = ["nebulento"]
 
 [project.entry-points."opm.pipeline"]
 ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"

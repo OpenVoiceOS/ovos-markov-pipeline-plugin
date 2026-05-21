@@ -23,6 +23,7 @@ For developers building on or extending the plugin:
 2. [Entity extraction](entities.md) — HMM BIO slot tagging with `SlotExtractor`
 3. [Calibration](calibration.md) — `evaluate()` and `find_optimal_thresholds()`
 4. [Model caching](caching.md) — exporting trained models to ONNX
+5. [Benchmark](benchmark.md) — accuracy and speed against the nebulento dataset
 
 ## At a glance
 

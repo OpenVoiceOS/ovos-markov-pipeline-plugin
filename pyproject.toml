@@ -32,3 +32,14 @@ version = { attr = "ovos_markov_pipeline.version.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["ovos_markov_pipeline*"]
+
+[tool.coverage.run]
+source = ["ovos_markov_pipeline"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

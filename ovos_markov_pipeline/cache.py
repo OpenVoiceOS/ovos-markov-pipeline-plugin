@@ -4,7 +4,6 @@ Saves trained models to disk as ONNX files + vocab JSON so they can be
 loaded instantly on restart without re-training.
 """
 
-import json
 from pathlib import Path
 from typing import Dict, Optional
 

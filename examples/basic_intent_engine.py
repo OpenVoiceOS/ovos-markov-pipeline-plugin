@@ -5,36 +5,60 @@ Demonstrates intent classification, confidence scoring, and slot
 extraction without requiring the full OVOS framework.
 """
 
-from ovos_markov_pipeline import MarkovIntentEngine, _ppx_to_confidence
-from ovos_markov_pipeline.slots import SlotExtractor
+from ovos_markov_pipeline import MarkovIntentEngine
 from ovos_markov_pipeline.calibration import evaluate
+from ovos_markov_pipeline.slots import SlotExtractor
 
 
 def main() -> None:
     # 1. Create and train intent engine
     engine = MarkovIntentEngine(order=1, kneser_ney=True, backoff=False)
 
-    engine.add_intent("weather:get_weather", [
-        "what is the weather", "what is the weather like",
-        "how is the weather today", "tell me the weather",
-        "what is the forecast", "is it going to rain",
-        "will it rain today", "what is the temperature",
-        "how hot is it outside", "what is the weather forecast",
-    ])
-    engine.add_intent("timer:set_timer", [
-        "set a timer for five minutes", "set a timer for ten minutes",
-        "start a timer", "set a countdown",
-        "timer for five minutes", "remind me in ten minutes",
-        "start a countdown", "set an alarm for five minutes",
-        "set a timer", "start a five minute timer",
-    ])
-    engine.add_intent("music:play_music", [
-        "play some music", "play jazz music",
-        "play rock and roll", "put on some music",
-        "play my playlist", "play something relaxing",
-        "i want to listen to music", "play the radio",
-        "play my favorite songs", "start playing music",
-    ])
+    engine.add_intent(
+        "weather:get_weather",
+        [
+            "what is the weather",
+            "what is the weather like",
+            "how is the weather today",
+            "tell me the weather",
+            "what is the forecast",
+            "is it going to rain",
+            "will it rain today",
+            "what is the temperature",
+            "how hot is it outside",
+            "what is the weather forecast",
+        ],
+    )
+    engine.add_intent(
+        "timer:set_timer",
+        [
+            "set a timer for five minutes",
+            "set a timer for ten minutes",
+            "start a timer",
+            "set a countdown",
+            "timer for five minutes",
+            "remind me in ten minutes",
+            "start a countdown",
+            "set an alarm for five minutes",
+            "set a timer",
+            "start a five minute timer",
+        ],
+    )
+    engine.add_intent(
+        "music:play_music",
+        [
+            "play some music",
+            "play jazz music",
+            "play rock and roll",
+            "put on some music",
+            "play my playlist",
+            "play something relaxing",
+            "i want to listen to music",
+            "play the radio",
+            "play my favorite songs",
+            "start playing music",
+        ],
+    )
 
     engine.train()
 

@@ -107,8 +107,9 @@ class TestMarkovHelloWorld(unittest.TestCase):
         responses = capture.finish()
 
         # Check that any match was at low confidence (not high/medium)
-        matched = [
-            m for m in responses
+        [
+            m
+            for m in responses
             if m.msg_type.endswith(".intent") or m.msg_type.endswith(".Greetings.intent")
         ]
         # The key assertion: it should NOT match at high confidence

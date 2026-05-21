@@ -6,14 +6,24 @@ from ovos_markov_pipeline.calibration import evaluate, find_optimal_thresholds
 
 def _make_engine() -> MarkovIntentEngine:
     engine = MarkovIntentEngine(order=1, kneser_ney=False, backoff=False)
-    engine.add_intent("weather:get", [
-        "what is the weather", "how is the weather",
-        "tell me the weather", "what is the forecast",
-    ])
-    engine.add_intent("timer:set", [
-        "set a timer", "start a timer",
-        "set a countdown", "timer for five minutes",
-    ])
+    engine.add_intent(
+        "weather:get",
+        [
+            "what is the weather",
+            "how is the weather",
+            "tell me the weather",
+            "what is the forecast",
+        ],
+    )
+    engine.add_intent(
+        "timer:set",
+        [
+            "set a timer",
+            "start a timer",
+            "set a countdown",
+            "timer for five minutes",
+        ],
+    )
     engine.train()
     return engine
 

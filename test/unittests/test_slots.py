@@ -64,7 +64,9 @@ class TestSlotExtractor:
             ],
         )
         ext.train()
-        slots = ext.extract("alarm:set_alarm", ["set", "alarm", "for", "monday", "at", "seven", "am"])
+        slots = ext.extract(
+            "alarm:set_alarm", ["set", "alarm", "for", "monday", "at", "seven", "am"]
+        )
         # Should extract at least one slot
         assert len(slots) > 0
 

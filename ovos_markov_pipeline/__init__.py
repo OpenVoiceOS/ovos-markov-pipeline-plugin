@@ -24,6 +24,8 @@ from ovos_plugin_manager.templates.pipeline import (
     IntentHandlerMatch,
 )
 from ovos_utils.fakebus import FakeBus
+
+from ovos_markov_pipeline._bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 
@@ -166,9 +168,33 @@ class MarkovIntentEngine:
         return not self._trained and len(self._intent_samples) > 0
 
     def add_intent(self, name: str, samples: List[str]) -> None:
-        """Register an intent with training samples."""
-        cleaned = [s.strip() for s in samples if s.strip()]
-        self._intent_samples[name] = cleaned
+        """Register an intent with training samples.
+
+        Samples may use OVOS template syntax:
+            ``(a|b)``  alternatives
+            ``[opt]``  optional components
+            ``{slot}`` slot placeholders (kept verbatim as features)
+
+        Each template is expanded via the local
+        :func:`ovos_markov_pipeline._bracket_expansion.expand_template`
+        helper, and the resulting concrete utterances are used as training
+        data.
+        """
+        expanded: set = set()
+        for s in samples:
+            if not s or not s.strip():
+                continue
+            try:
+                for variant in expand_template(s):
+                    v = variant.strip()
+                    if v:
+                        expanded.add(v)
+            except Exception:
+                # Fall back to the raw sample if expansion fails for any reason
+                v = s.strip()
+                if v:
+                    expanded.add(v)
+        self._intent_samples[name] = list(expanded)
         self._trained = False
 
     def remove_intent(self, name: str) -> None:

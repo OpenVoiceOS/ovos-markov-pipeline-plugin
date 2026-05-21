@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0a3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.2.0a3) (2026-05-21)
+
+[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a2...0.2.0a3)
+
+**Merged pull requests:**
+
+- test: expand unit coverage to 98% [\#6](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/6) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.0a2](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.2.0a2) (2026-05-21)
 
 [Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a1...0.2.0a2)

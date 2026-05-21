@@ -55,16 +55,19 @@ across models.
 ## From perplexity to confidence
 
 OVOS pipelines work in confidence scores between 0 and 1, not perplexity. The
-plugin maps one to the other:
+plugin maps one to the other with a softmax over every intent's
+log-likelihood:
 
 ```text
-confidence = 1 / (1 + log(perplexity))
+log_likelihood(intent) = -log(perplexity(intent))
+confidence(intent)     = softmax(temperature * log_likelihood)[intent]
 ```
 
-Lower perplexity produces higher confidence. A perplexity at or below 1.0 maps
-to a confidence of 1.0; the result is always clamped to `[0, 1]`. This mapping
-is intentionally simple — see [Calibration](calibration.md) for measuring
-whether the thresholds derived from it suit your data.
+The confidences sum to 1 across intents, so each one reflects how far that
+intent outscored the rest, not just its own perplexity. A decisive winner
+approaches 1.0; a close call spreads the mass out. See
+[Calibration](calibration.md) for measuring whether the thresholds derived
+from it suit your data.
 
 ## Confidence tiers
 

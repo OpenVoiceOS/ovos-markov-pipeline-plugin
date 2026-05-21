@@ -8,22 +8,13 @@ All engines train on the templates in ``INTENTS[name]["train"]`` and are
 scored on the natural-language utterances in ``test_match`` plus the
 ``NO_MATCH_UTTERANCES`` negatives.
 
-Confidence variants
--------------------
-The Markov engine's shipped confidence is an *absolute* transform of one
-intent's perplexity: ``conf = 1 / (1 + log(ppx))``. The ``relative``
-runs instead rescore confidence as a softmax posterior over every
-intent's log-likelihood, so the number reflects how far the winning
-intent beat the rest. Argmax is unchanged (softmax is monotonic), so
-this only moves the threshold-gated metrics, not argmax recall.
-
 Reported per engine
 -------------------
 * **Argmax recall** — top-ranked intent correct, no threshold (ceiling).
-* **AUC** — how well the confidence separates correct argmax matches
+* **AUC** — ROC-AUC of the confidence separating correct argmax matches
   from wrong / no-match cases.
 * **F1 @0.5** — gated at the fixed nebulento threshold.
-* **F1 @best** — gated at the F1-optimal threshold (swept per engine).
+* **F1 @best** — gated at the F1-optimal threshold, swept per engine.
 
 Usage
 -----
@@ -32,7 +23,6 @@ Usage
 import contextlib
 import io
 import logging
-import math
 import statistics
 import time
 
@@ -60,22 +50,6 @@ def all_cases():
     for utt in NO_MATCH_UTTERANCES:
         cases.append((utt, None))
     return cases
-
-
-def relative_conf(scores, beta):
-    """Rescore an intent ranking as a softmax posterior.
-
-    ``scores`` is the engine's full ``[(name, conf), ...]`` list. Each
-    shipped confidence ``conf = 1/(1+log(ppx))`` is inverted back to a
-    log-likelihood ``ll = -log(ppx) = 1 - 1/conf``; a softmax over those
-    (sharpened by ``beta``) yields a posterior per intent. Order is
-    preserved — softmax is monotonic — so the argmax never changes.
-    """
-    lls = [(name, 1.0 - 1.0 / min(max(c, 1e-6), 1.0)) for name, c in scores]
-    mx = max(ll for _, ll in lls)
-    exps = [(name, math.exp(beta * (ll - mx))) for name, ll in lls]
-    z = sum(e for _, e in exps) or 1.0
-    return [(name, e / z) for name, e in exps]
 
 
 def argmax_recall(results, cases):
@@ -160,9 +134,7 @@ def print_report(label, results, cases, latencies, train_ms=None):
 
 # ── engine runners ─────────────────────────────────────────────────────────
 
-def run_markov(cases, label, beta=None, **engine_kwargs):
-    """Run MarkovIntentEngine. If *beta* is set, rescore confidence
-    relatively via :func:`relative_conf` with that softmax temperature."""
+def run_markov(cases, label, **engine_kwargs):
     from ovos_markov_pipeline import MarkovIntentEngine
 
     engine = MarkovIntentEngine(**engine_kwargs)
@@ -178,8 +150,6 @@ def run_markov(cases, label, beta=None, **engine_kwargs):
         t0 = time.perf_counter()
         with _quiet():
             scores = engine.calc_intents(utt)
-        if beta is not None and scores:
-            scores = relative_conf(scores, beta)
         latencies.append((time.perf_counter() - t0) * 1000)
         results.append(scores[0] if scores else (None, 0.0))
 
@@ -216,13 +186,13 @@ def run_nebulento(cases, strategy_name="TOKEN_SET_RATIO"):
 
 def summary(rows):
     print(f"\n\n{'─' * 92}")
-    print(f"  {'Engine':<34} {'Argmax':>7} {'AUC':>6} {'F1@0.5':>7} "
+    print(f"  {'Engine':<32} {'Argmax':>7} {'AUC':>6} {'F1@0.5':>7} "
           f"{'F1@best':>8} {'(thr)':>7}  {'Median':>9}")
     print(f"{'─' * 92}")
     for label, results, cases, latencies in rows:
         m05 = compute_metrics(results, cases, THRESHOLD)
         bf1, bthr, _ = best_f1(results, cases)
-        print(f"  {label:<34} {argmax_recall(results, cases):>6.1%} "
+        print(f"  {label:<32} {argmax_recall(results, cases):>6.1%} "
               f"{auc(results, cases):>6.3f} {m05['f1']:>7.3f} "
               f"{bf1:>8.3f} {bthr:>7.2f}  "
               f"{statistics.median(latencies):>6.2f}ms")
@@ -247,16 +217,13 @@ if __name__ == "__main__":
         rows.append(neb)
 
     rows.append(run_markov(
-        cases, "markov  order=1  absolute conf",
+        cases, "markov  order=1",
         order=1, kneser_ney=True, backoff=True))
     rows.append(run_markov(
-        cases, "markov  order=1  relative b=3",
-        beta=3.0, order=1, kneser_ney=True, backoff=True))
+        cases, "markov  order=2  (default)",
+        order=2, kneser_ney=True, backoff=True))
     rows.append(run_markov(
-        cases, "markov  order=2  char_fb  absolute",
+        cases, "markov  order=2  char_fallback",
         order=2, kneser_ney=True, backoff=True, char_fallback=True))
-    rows.append(run_markov(
-        cases, "markov  order=2  char_fb  relative b=3",
-        beta=3.0, order=2, kneser_ney=True, backoff=True, char_fallback=True))
 
     summary(rows)

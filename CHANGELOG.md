@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0a1](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.4.0a1) (2026-05-21)
+
+[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.3.0a1...0.4.0a1)
+
+**Merged pull requests:**
+
+- feat: softmax-posterior confidence + intent-engine benchmark [\#9](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/9) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.0a1](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.3.0a1) (2026-05-21)
 
 [Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a3...0.3.0a1)

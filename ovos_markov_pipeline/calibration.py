@@ -4,10 +4,9 @@ Provides tools to evaluate and tune the perplexity-to-confidence mapping
 against labelled evaluation data.
 """
 
-import math
 from typing import Dict, List, Tuple
 
-from ovos_markov_pipeline import MarkovIntentEngine, _ppx_to_confidence
+from ovos_markov_pipeline import MarkovIntentEngine
 
 
 def evaluate(
@@ -74,9 +73,7 @@ def evaluate(
         "precision": avg_p,
         "recall": avg_r,
         "f1": f1,
-        "avg_confidence_correct": (
-            sum(conf_correct) / len(conf_correct) if conf_correct else 0.0
-        ),
+        "avg_confidence_correct": (sum(conf_correct) / len(conf_correct) if conf_correct else 0.0),
         "avg_confidence_incorrect": (
             sum(conf_incorrect) / len(conf_incorrect) if conf_incorrect else 0.0
         ),

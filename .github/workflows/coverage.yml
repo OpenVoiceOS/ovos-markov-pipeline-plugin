@@ -13,4 +13,4 @@ jobs:
       coverage_source: 'ovos_markov_pipeline'
       test_path: 'test'
       install_extras: 'test'
-      min_coverage: 0
+      min_coverage: 85

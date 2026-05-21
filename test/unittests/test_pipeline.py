@@ -22,21 +22,38 @@ def _make_pipeline(**extra_config) -> MarkovPipeline:
     pipeline = MarkovPipeline(bus=bus, config=config)
 
     for name, samples in [
-        ("weather_skill:get_weather", [
-            "what is the weather", "what is the weather like",
-            "how is the weather today", "tell me the weather forecast",
-            "is it going to rain today", "what is the temperature outside",
-        ]),
-        ("timer_skill:set_timer", [
-            "set a timer for five minutes", "set a timer for ten minutes",
-            "start a timer", "set a countdown timer",
-            "timer for three minutes please", "start a five minute timer",
-        ]),
+        (
+            "weather_skill:get_weather",
+            [
+                "what is the weather",
+                "what is the weather like",
+                "how is the weather today",
+                "tell me the weather forecast",
+                "is it going to rain today",
+                "what is the temperature outside",
+            ],
+        ),
+        (
+            "timer_skill:set_timer",
+            [
+                "set a timer for five minutes",
+                "set a timer for ten minutes",
+                "start a timer",
+                "set a countdown timer",
+                "timer for three minutes please",
+                "start a five minute timer",
+            ],
+        ),
     ]:
-        msg = Message("padatious:register_intent", {
-            "name": name, "skill_id": name.split(":")[0],
-            "samples": samples, "lang": "en-US",
-        })
+        msg = Message(
+            "padatious:register_intent",
+            {
+                "name": name,
+                "skill_id": name.split(":")[0],
+                "samples": samples,
+                "lang": "en-US",
+            },
+        )
         pipeline.register_intent(msg)
 
     return pipeline
@@ -90,9 +107,7 @@ class TestMarkovPipeline:
 
     def test_detach_skill(self) -> None:
         pipeline = _make_pipeline()
-        pipeline.handle_detach_skill(
-            Message("detach_skill", {"skill_id": "timer_skill"})
-        )
+        pipeline.handle_detach_skill(Message("detach_skill", {"skill_id": "timer_skill"}))
         assert "timer_skill:set_timer" not in pipeline.registered_intents
 
     def test_unknown_lang_returns_none(self) -> None:
@@ -105,9 +120,7 @@ class TestMarkovPipeline:
         pipeline = _make_pipeline()
         pipeline.max_words = 3
         msg = Message("recognizer_loop:utterance", {})
-        result = pipeline.match_low(
-            ["this sentence has way too many words"], "en-US", msg
-        )
+        result = pipeline.match_low(["this sentence has way too many words"], "en-US", msg)
         assert result is None
 
     def test_shutdown(self) -> None:
@@ -140,42 +153,49 @@ class TestMarkovPipeline:
         pipeline = _make_pipeline(char_fallback=True)
         msg = Message("recognizer_loop:utterance", {})
         # Should work without crashing
-        result = pipeline.match_low(["what is the weather"], "en-US", msg)
+        pipeline.match_low(["what is the weather"], "en-US", msg)
         # Just verify it doesn't crash
 
     def test_online_learning_config(self) -> None:
         pipeline = _make_pipeline(online_learning=True)
         msg = Message("recognizer_loop:utterance", {})
         # Match should still work
-        result = pipeline.match_low(["what is the weather"], "en-US", msg)
+        pipeline.match_low(["what is the weather"], "en-US", msg)
 
     def test_stemmer_config(self) -> None:
         pipeline = _make_pipeline(stem=True)
         msg = Message("recognizer_loop:utterance", {})
-        result = pipeline.match_low(["what is the weather"], "en-US", msg)
+        pipeline.match_low(["what is the weather"], "en-US", msg)
 
     def test_register_intent_from_file(self) -> None:
         import tempfile
+
         pipeline = _make_pipeline()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".intent", delete=False) as f:
             f.write("hello world\ngoodbye world\n")
             path = f.name
-        msg = Message("padatious:register_intent", {
-            "name": "test_skill:greet",
-            "skill_id": "test_skill",
-            "file_name": path,
-            "lang": "en-US",
-        })
+        msg = Message(
+            "padatious:register_intent",
+            {
+                "name": "test_skill:greet",
+                "skill_id": "test_skill",
+                "file_name": path,
+                "lang": "en-US",
+            },
+        )
         pipeline.register_intent(msg)
         assert "test_skill:greet" in pipeline.registered_intents
 
     def test_register_no_samples_no_file(self) -> None:
         pipeline = _make_pipeline()
-        msg = Message("padatious:register_intent", {
-            "name": "test_skill:bad",
-            "skill_id": "test_skill",
-            "lang": "en-US",
-        })
+        msg = Message(
+            "padatious:register_intent",
+            {
+                "name": "test_skill:bad",
+                "skill_id": "test_skill",
+                "lang": "en-US",
+            },
+        )
         pipeline.register_intent(msg)
         # Should log error but not crash
         assert "test_skill:bad" not in pipeline.registered_intents

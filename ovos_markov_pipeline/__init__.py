@@ -11,12 +11,10 @@ import math
 import re
 import string
 from collections import defaultdict
-from functools import lru_cache
-from pathlib import Path
 from threading import Event, RLock
 from typing import Dict, List, Optional, Tuple, Union
 
-import numpy as np
+from markovonnx import MarkovChain, Vocabulary, char_tokenize, word_tokenize
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
@@ -29,30 +27,51 @@ from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 
-from markovonnx import MarkovChain, Vocabulary, char_tokenize, word_tokenize
-
 from ovos_markov_pipeline.version import __version__
+
+__all__ = ["MarkovPipeline", "MarkovIntentEngine", "__version__"]
 
 
 # ---------------------------------------------------------------------------
 # Stemmer (adapted from ovos-padatious-pipeline-plugin)
 # ---------------------------------------------------------------------------
 
+
 class _Stemmer:
     """Snowball stemmer wrapper. Fails gracefully if unsupported."""
 
     _LANGS = {
-        "ar": "arabic", "eu": "basque", "ca": "catalan", "da": "danish",
-        "nl": "dutch", "en": "english", "fi": "finnish", "fr": "french",
-        "de": "german", "el": "greek", "hi": "hindi", "hu": "hungarian",
-        "id": "indonesian", "ga": "irish", "it": "italian", "lt": "lithuanian",
-        "ne": "nepali", "no": "norwegian", "pt": "portuguese", "ro": "romanian",
-        "ru": "russian", "sr": "serbian", "es": "spanish", "sv": "swedish",
-        "ta": "tamil", "tr": "turkish",
+        "ar": "arabic",
+        "eu": "basque",
+        "ca": "catalan",
+        "da": "danish",
+        "nl": "dutch",
+        "en": "english",
+        "fi": "finnish",
+        "fr": "french",
+        "de": "german",
+        "el": "greek",
+        "hi": "hindi",
+        "hu": "hungarian",
+        "id": "indonesian",
+        "ga": "irish",
+        "it": "italian",
+        "lt": "lithuanian",
+        "ne": "nepali",
+        "no": "norwegian",
+        "pt": "portuguese",
+        "ro": "romanian",
+        "ru": "russian",
+        "sr": "serbian",
+        "es": "spanish",
+        "sv": "swedish",
+        "ta": "tamil",
+        "tr": "turkish",
     }
 
     def __init__(self, lang: str):
         import snowballstemmer
+
         lang2 = lang.split("-")[0].lower()
         if lang2 not in self._LANGS:
             raise ValueError(f"Unsupported stemmer language: {lang}")
@@ -71,6 +90,7 @@ class _Stemmer:
 # ---------------------------------------------------------------------------
 # Normalization helpers
 # ---------------------------------------------------------------------------
+
 
 def _normalize(text: str, stemmer: Optional[_Stemmer] = None) -> str:
     """Lowercase, collapse whitespace, strip punctuation, optionally stem."""
@@ -97,6 +117,7 @@ def _ppx_to_confidence(ppx: float) -> float:
 # ---------------------------------------------------------------------------
 # MarkovIntentEngine
 # ---------------------------------------------------------------------------
+
 
 class MarkovIntentEngine:
     """Per-language intent matching engine using Markov chain perplexity.
@@ -195,8 +216,10 @@ class MarkovIntentEngine:
             if not seqs:
                 continue
             mc = MarkovChain(
-                order=self.order, vocab=self._vocab,
-                smoothing=self.smoothing, backoff=self.backoff,
+                order=self.order,
+                vocab=self._vocab,
+                smoothing=self.smoothing,
+                backoff=self.backoff,
                 kneser_ney=self.kneser_ney,
             )
             mc.fit(seqs)
@@ -219,8 +242,10 @@ class MarkovIntentEngine:
                 if not seqs:
                     continue
                 mc = MarkovChain(
-                    order=3, vocab=self._char_vocab,
-                    smoothing=self.smoothing, backoff=True,
+                    order=3,
+                    vocab=self._char_vocab,
+                    smoothing=self.smoothing,
+                    backoff=True,
                     kneser_ney=self.kneser_ney,
                 )
                 mc.fit(seqs)
@@ -318,6 +343,7 @@ class MarkovIntentEngine:
 # MarkovPipeline (OPM ConfidenceMatcherPipeline)
 # ---------------------------------------------------------------------------
 
+
 class MarkovPipeline(ConfidenceMatcherPipeline):
     """OVOS pipeline plugin for Markov chain perplexity-based intent matching.
 
@@ -355,7 +381,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         core_config = Configuration()
         self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
         langs = core_config.get("secondary_langs") or []
-        langs = [standardize_lang_tag(l) for l in langs]
+        langs = [standardize_lang_tag(lng) for lng in langs]
         if self.lang not in langs:
             langs.append(self.lang)
 

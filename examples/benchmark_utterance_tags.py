@@ -31,9 +31,10 @@ DATA_PATH = (
 )
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from ovos_markov_pipeline import MarkovIntentEngine, _ppx_to_confidence
+from ovos_markov_pipeline import MarkovIntentEngine
 from ovos_markov_pipeline.calibration import evaluate, find_optimal_thresholds
 
 
@@ -154,7 +155,7 @@ def main() -> None:
     tag_counts = Counter(tag for _, tag in data)
     print(f"\nClass distribution ({len(tag_counts)} classes):")
     for tag, count in tag_counts.most_common():
-        print(f"  {tag:<30s} {count:>5d}  ({100*count/len(data):>5.1f}%)")
+        print(f"  {tag:<30s} {count:>5d}  ({100 * count / len(data):>5.1f}%)")
 
     # Split
     train, test = split_data(data, train_ratio=0.8)
@@ -169,8 +170,10 @@ def main() -> None:
         (2, True, True),
     ]
 
-    print(f"\n{'Order':<6} {'KN':<5} {'BO':<5} {'Acc':<8} {'P':<8} {'R':<8} "
-          f"{'F1':<8} {'Train ms':<10} {'QPS':<8} {'Best θ':<8} {'Best F1':<8}")
+    print(
+        f"\n{'Order':<6} {'KN':<5} {'BO':<5} {'Acc':<8} {'P':<8} {'R':<8} "
+        f"{'F1':<8} {'Train ms':<10} {'QPS':<8} {'Best θ':<8} {'Best F1':<8}"
+    )
     print("-" * 95)
 
     results = []
@@ -186,15 +189,19 @@ def main() -> None:
 
     # Best config
     best = max(results, key=lambda r: r["f1"])
-    print(f"\nBest config: order={best['order']}, KN={best['kneser_ney']}, "
-          f"backoff={best['backoff']} → F1={best['f1']:.3f}")
+    print(
+        f"\nBest config: order={best['order']}, KN={best['kneser_ney']}, "
+        f"backoff={best['backoff']} → F1={best['f1']:.3f}"
+    )
 
     # Per-class analysis with best config
-    print(f"\n--- Per-class breakdown (order={best['order']}, "
-          f"KN={best['kneser_ney']}, backoff={best['backoff']}) ---")
-    engine = train_engine(train, order=best["order"],
-                          kneser_ney=best["kneser_ney"],
-                          backoff=best["backoff"])
+    print(
+        f"\n--- Per-class breakdown (order={best['order']}, "
+        f"KN={best['kneser_ney']}, backoff={best['backoff']}) ---"
+    )
+    engine = train_engine(
+        train, order=best["order"], kneser_ney=best["kneser_ney"], backoff=best["backoff"]
+    )
 
     per_class_correct: Dict[str, int] = {}
     per_class_total: Dict[str, int] = {}
@@ -215,10 +222,10 @@ def main() -> None:
     for tag in sorted(per_class_total.keys()):
         c = per_class_correct.get(tag, 0)
         t = per_class_total[tag]
-        print(f"{tag:<30s} {c:<10d} {t:<8d} {c/t:<8.3f}")
+        print(f"{tag:<30s} {c:<10d} {t:<8d} {c / t:<8.3f}")
 
     # Top confusions
-    print(f"\nTop confusions:")
+    print("\nTop confusions:")
     confusions_flat = []
     for true_tag, preds in confusion.items():
         for pred_tag, count in preds.items():

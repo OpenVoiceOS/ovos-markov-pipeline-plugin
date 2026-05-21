@@ -66,24 +66,45 @@ class TestMarkovIntentEngine:
         defaults = dict(order=1, kneser_ney=False, backoff=False)
         defaults.update(kwargs)
         engine = MarkovIntentEngine(**defaults)
-        engine.add_intent("weather:get_weather", [
-            "what is the weather", "what is the weather like",
-            "how is the weather today", "tell me the weather",
-            "what is the forecast", "is it going to rain",
-            "will it rain today", "what is the temperature",
-        ])
-        engine.add_intent("timer:set_timer", [
-            "set a timer for five minutes", "set a timer for ten minutes",
-            "start a timer", "set a countdown",
-            "timer for five minutes", "remind me in ten minutes",
-            "start a countdown", "set an alarm for five minutes",
-        ])
-        engine.add_intent("music:play_music", [
-            "play some music", "play jazz music",
-            "play rock and roll", "put on some music",
-            "play my playlist", "play something relaxing",
-            "i want to listen to music", "play the radio",
-        ])
+        engine.add_intent(
+            "weather:get_weather",
+            [
+                "what is the weather",
+                "what is the weather like",
+                "how is the weather today",
+                "tell me the weather",
+                "what is the forecast",
+                "is it going to rain",
+                "will it rain today",
+                "what is the temperature",
+            ],
+        )
+        engine.add_intent(
+            "timer:set_timer",
+            [
+                "set a timer for five minutes",
+                "set a timer for ten minutes",
+                "start a timer",
+                "set a countdown",
+                "timer for five minutes",
+                "remind me in ten minutes",
+                "start a countdown",
+                "set an alarm for five minutes",
+            ],
+        )
+        engine.add_intent(
+            "music:play_music",
+            [
+                "play some music",
+                "play jazz music",
+                "play rock and roll",
+                "put on some music",
+                "play my playlist",
+                "play something relaxing",
+                "i want to listen to music",
+                "play the radio",
+            ],
+        )
         engine.train()
         return engine
 
@@ -190,11 +211,14 @@ class TestMarkovIntentEngine:
         if _Stemmer.supports("en"):
             stemmer = _Stemmer("en")
             engine = MarkovIntentEngine(order=1, stemmer=stemmer)
-            engine.add_intent("test:run", [
-                "the dogs are running",
-                "she runs every morning",
-                "running is fun",
-            ])
+            engine.add_intent(
+                "test:run",
+                [
+                    "the dogs are running",
+                    "she runs every morning",
+                    "running is fun",
+                ],
+            )
             engine.train()
             scores = engine.calc_intents("the dog ran")
             assert len(scores) > 0

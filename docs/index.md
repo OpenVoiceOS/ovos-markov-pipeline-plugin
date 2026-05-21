@@ -1,65 +1,54 @@
-# ovos-markov-pipeline-plugin
+# ovos-markov-pipeline-plugin documentation
 
-OVOS intent pipeline plugin using Markov chain perplexity ensemble from markovonnx.
+`ovos-markov-pipeline-plugin` is an OVOS intent pipeline plugin that classifies
+utterances with an ensemble of per-intent Markov chains, scored by perplexity.
 
-## Architecture
+This documentation goes from zero to hero. If you have never heard of a Markov
+chain, start with [Concepts](concepts.md). If you just want it running, jump to
+the [Quickstart](quickstart.md).
 
-```
-Utterance → normalize (+ stem) → word tokenize
-  → compute perplexity under each intent model
-  → lowest PPX wins → confidence = 1/(1+log(ppx))
-  → optional: char-level fallback blend when ambiguous
-  → optional: HMM BIO slot extraction on matched intent
-```
+## Reading order
 
-## Modules
+For users integrating the plugin into an OVOS install:
 
-| Module | Description |
-|--------|-------------|
-| `__init__.py` | `MarkovPipeline` (OPM entry), `MarkovIntentEngine` (per-lang ensemble) |
-| `slots.py` | `SlotExtractor` — HMM BIO tagging for entity extraction |
-| `cache.py` | `IntentCache` — ONNX disk cache for trained models |
-| `calibration.py` | `evaluate()`, `find_optimal_thresholds()` — confidence tuning |
+1. [Concepts](concepts.md) — the idea behind perplexity-based intent matching
+2. [Quickstart](quickstart.md) — install and enable the pipeline
+3. [Configuration](configuration.md) — every config key, with defaults
+4. [Tuning](tuning.md) — get the best accuracy for your skill set
+5. [Troubleshooting](troubleshooting.md) — when something does not match
 
-## Configuration
+For developers building on or extending the plugin:
 
-```json
-{
-  "intents": {
-    "ovos-markov-pipeline-plugin": {
-      "order": 2,
-      "kneser_ney": true,
-      "backoff": true,
-      "stem": false,
-      "char_fallback": false,
-      "online_learning": false,
-      "smoothing": 1e-5,
-      "conf_high": 0.75,
-      "conf_med": 0.55,
-      "conf_low": 0.30,
-      "max_words": 50,
-      "instant_train": false
-    }
-  }
-}
+1. [Pipeline integration](pipeline.md) — the OPM entry point and bus protocol
+2. [Entity extraction](entities.md) — HMM BIO slot tagging with `SlotExtractor`
+3. [Calibration](calibration.md) — `evaluate()` and `find_optimal_thresholds()`
+4. [Model caching](caching.md) — exporting trained models to ONNX
+
+## At a glance
+
+```text
+utterance
+  -> normalize (lowercase, strip punctuation, optional stem)
+  -> word tokenize
+  -> perplexity under each per-intent Markov chain
+  -> lowest perplexity wins
+  -> confidence = 1 / (1 + log(perplexity))
+  -> optional: char-level fallback blend when the top two are close
+  -> optional: HMM BIO slot extraction on the matched intent
 ```
 
-## Bus Messages
+## Package layout
 
-| Message | Direction | Description |
-|---------|-----------|-------------|
-| `padatious:register_intent` | In | Register intent samples |
-| `detach_intent` / `detach_skill` | In | Remove intents |
-| `mycroft.skills.train` | In | Trigger training |
-| `mycroft.skills.trained` | Out | Training complete |
-| `intent.service.markov.manifest.get/manifest` | In/Out | Query registered intents |
+| Module           | Public API                                                        |
+| ---------------- | ------------------------------------------------------------------ |
+| `__init__.py`    | `MarkovPipeline` (OPM entry point), `MarkovIntentEngine`           |
+| `slots.py`       | `SlotExtractor` — HMM BIO entity extraction                        |
+| `cache.py`       | `IntentCache` — ONNX disk cache for trained models                 |
+| `calibration.py` | `evaluate()`, `find_optimal_thresholds()`                          |
 
-## Features
+## Requirements
 
-- **Stemming**: Snowball stemmer for 26 languages (`"stem": true`)
-- **Char fallback**: Blend 60% word + 40% char scores when top-2 are ambiguous
-- **Online learning**: High-confidence matches reinforce intent models incrementally
-- **Entity extraction**: HMM Viterbi BIO tagging via `SlotExtractor`
-- **ONNX cache**: `IntentCache` saves/loads models as sparse ONNX + vocab JSON
-- **Calibration**: `evaluate()` for P/R/F1, `find_optimal_thresholds()` for threshold tuning
-- **CI/CD**: Full OVOS workflow suite (build-tests, OPM check, coverage, release, etc.)
+- Python 3.10+
+- [`markovonnx`](https://pypi.org/project/markovonnx/) — Markov chain models
+- `ovos-plugin-manager`, `ovos-bus-client`, `ovos-config`, `ovos-utils`
+- `snowballstemmer` (optional, for stemming) — install the `stem` extra

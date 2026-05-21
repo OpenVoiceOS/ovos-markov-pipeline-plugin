@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.0a3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.1.0a3) (2026-05-21)
+
+[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.1.0a2...0.1.0a3)
+
+**Merged pull requests:**
+
+- ci: adopt pre-commit and harden the coverage gate [\#5](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/5) ([JarbasAl](https://github.com/JarbasAl))
+- feat: expand OVOS template syntax in intent samples [\#3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/3) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.1.0a2](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.1.0a2) (2026-05-21)
 
 [Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/03a6082ebc045a78e4031de27af3c0645bbce6b2...0.1.0a2)

@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ovos-markov-pipeline-plugin"
 dynamic = ["version"]
 description = "OVOS intent pipeline plugin using Markov chain perplexity ensemble"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 dependencies = [

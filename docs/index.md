@@ -23,6 +23,7 @@ For developers building on or extending the plugin:
 2. [Entity extraction](entities.md) — HMM BIO slot tagging with `SlotExtractor`
 3. [Calibration](calibration.md) — `evaluate()` and `find_optimal_thresholds()`
 4. [Model caching](caching.md) — exporting trained models to ONNX
+5. [Benchmark](benchmark.md) — accuracy and speed against the nebulento dataset
 
 ## At a glance
 
@@ -32,7 +33,7 @@ utterance
   -> word tokenize
   -> perplexity under each per-intent Markov chain
   -> lowest perplexity wins
-  -> confidence = 1 / (1 + log(perplexity))
+  -> confidence = softmax over per-intent log-likelihoods
   -> optional: char-level fallback blend when the top two are close
   -> optional: HMM BIO slot extraction on the matched intent
 ```

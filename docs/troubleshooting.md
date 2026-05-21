@@ -45,9 +45,10 @@ hold. Fix the ordering in `mycroft.conf`.
 training one Markov chain per intent and picking the model with the lowest
 perplexity. See [Concepts](concepts.md).
 
-**How does confidence scoring work?** `confidence = 1 / (1 + log(perplexity))`.
-Lower perplexity means higher confidence. Tune the thresholds with
-[`find_optimal_thresholds()`](calibration.md).
+**How does confidence scoring work?** Confidence is a softmax over every
+intent's log-likelihood (`-log(perplexity)`), so the scores sum to 1 and
+reflect how far the winning intent outscored the rest. Tune the thresholds
+with [`find_optimal_thresholds()`](calibration.md).
 
 **What order should I use?** Order 1 for small training sets (5-20 examples per
 intent), order 2 for 20 or more. See [Tuning](tuning.md).

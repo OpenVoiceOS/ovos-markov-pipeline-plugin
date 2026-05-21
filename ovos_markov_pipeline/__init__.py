@@ -4,7 +4,7 @@ Trains one word-level Markov chain per intent from example utterances.
 Classifies by computing perplexity under each model — the intent whose
 model assigns the lowest perplexity (highest likelihood) wins.
 
-Confidence is derived from perplexity via: conf = 1 / (1 + log(ppx))
+Confidence is a softmax posterior over the per-intent perplexities.
 """
 
 import math
@@ -104,16 +104,28 @@ def _normalize(text: str, stemmer: Optional[_Stemmer] = None) -> str:
     return text
 
 
-def _ppx_to_confidence(ppx: float) -> float:
-    """Convert perplexity to a 0-1 confidence score.
+#: Softmax temperature for the perplexity-to-posterior mapping. Higher
+#: values sharpen the distribution toward a decisive winner.
+_SOFTMAX_TEMPERATURE = 3.0
 
-    Lower perplexity → higher confidence.
-    Formula: conf = 1 / (1 + log(ppx))
-    Clamped to [0, 1].
+
+def _posterior(scored: List[Tuple[str, float]]) -> List[Tuple[str, float]]:
+    """Turn per-intent perplexities into a softmax posterior.
+
+    Each perplexity becomes a log-likelihood (``-log ppx``); a
+    temperature-scaled softmax over every intent yields a 0-1 confidence
+    that reflects how far the best intent outscored the rest. Returned
+    sorted by confidence descending.
     """
-    if ppx <= 1.0:
-        return 1.0
-    return max(0.0, min(1.0, 1.0 / (1.0 + math.log(ppx))))
+    if not scored:
+        return []
+    lls = [(name, -math.log(max(ppx, 1e-9))) for name, ppx in scored]
+    top = max(ll for _, ll in lls)
+    exps = [(name, math.exp(_SOFTMAX_TEMPERATURE * (ll - top))) for name, ll in lls]
+    z = sum(e for _, e in exps) or 1.0
+    out = [(name, e / z) for name, e in exps]
+    out.sort(key=lambda x: -x[1])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -300,19 +312,16 @@ class MarkovIntentEngine:
         if len(word_tokens) < self.order:
             return []
 
-        scores: List[Tuple[str, float]] = []
+        raw: List[Tuple[str, float]] = []
         for name, mc in self._models.items():
             if name in blacklisted_intents:
                 continue
             skill_id = name.split(":")[0] if ":" in name else name
             if skill_id in blacklisted_skills:
                 continue
+            raw.append((name, mc.perplexity([word_tokens])))
 
-            ppx = mc.perplexity([word_tokens])
-            conf = _ppx_to_confidence(ppx)
-            scores.append((name, conf))
-
-        scores.sort(key=lambda x: -x[1])
+        scores = _posterior(raw)
 
         # Character-level fallback: if top-2 word scores are too close
         if (
@@ -323,15 +332,15 @@ class MarkovIntentEngine:
         ):
             char_tokens = char_tokenize(norm)
             if len(char_tokens) >= 3:
-                char_scores: Dict[str, float] = {}
+                char_raw: List[Tuple[str, float]] = []
                 for name, mc in self._char_models.items():
                     if name in blacklisted_intents:
                         continue
                     skill_id = name.split(":")[0] if ":" in name else name
                     if skill_id in blacklisted_skills:
                         continue
-                    ppx = mc.perplexity([char_tokens])
-                    char_scores[name] = _ppx_to_confidence(ppx)
+                    char_raw.append((name, mc.perplexity([char_tokens])))
+                char_scores: Dict[str, float] = dict(_posterior(char_raw))
 
                 # Blend: 60% word + 40% char (use word-only if no char model)
                 blended: List[Tuple[str, float]] = []

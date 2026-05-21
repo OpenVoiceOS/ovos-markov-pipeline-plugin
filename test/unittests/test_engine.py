@@ -1,6 +1,6 @@
 """Tests for MarkovIntentEngine."""
 
-from ovos_markov_pipeline import MarkovIntentEngine, _normalize, _ppx_to_confidence, _Stemmer
+from ovos_markov_pipeline import MarkovIntentEngine, _normalize, _posterior, _Stemmer
 
 
 class TestNormalize:
@@ -45,20 +45,29 @@ class TestStemmer:
             pass
 
 
-class TestPpxToConfidence:
-    def test_low_ppx_high_confidence(self) -> None:
-        assert _ppx_to_confidence(1.0) == 1.0
+class TestPosterior:
+    def test_empty(self) -> None:
+        assert _posterior([]) == []
 
-    def test_high_ppx_low_confidence(self) -> None:
-        conf = _ppx_to_confidence(1000.0)
-        assert 0.0 < conf < 0.2
+    def test_sorted_descending_lowest_ppx_wins(self) -> None:
+        out = _posterior([("a", 50.0), ("b", 5.0), ("c", 500.0)])
+        confs = [c for _, c in out]
+        assert confs == sorted(confs, reverse=True)
+        assert out[0][0] == "b"
 
-    def test_moderate_ppx(self) -> None:
-        conf = _ppx_to_confidence(10.0)
-        assert 0.2 < conf < 0.5
+    def test_sums_to_one(self) -> None:
+        out = _posterior([("a", 10.0), ("b", 20.0), ("c", 30.0)])
+        assert abs(sum(c for _, c in out) - 1.0) < 1e-9
 
-    def test_ppx_below_one(self) -> None:
-        assert _ppx_to_confidence(0.5) == 1.0
+    def test_in_unit_range(self) -> None:
+        out = _posterior([("a", 2.0), ("b", 999.0)])
+        for _, conf in out:
+            assert 0.0 <= conf <= 1.0
+
+    def test_decisive_winner_high_confidence(self) -> None:
+        out = _posterior([("a", 1.5), ("b", 1e6), ("c", 1e6)])
+        assert out[0][0] == "a"
+        assert out[0][1] > 0.9
 
 
 class TestMarkovIntentEngine:

@@ -24,7 +24,6 @@ from ovos_markov_pipeline import (  # noqa: E402
     MarkovIntentEngine,
 )
 
-
 PIPELINE_ID = "ovos-markov-domain-pipeline-plugin"
 
 DOMAIN_PIPELINE = [
@@ -159,11 +158,12 @@ class TestDomainRegistrationRouting(_DomainE2EBase):
         }))
         engine = self.pipeline.engines["en-US"]
         sub = engine.domains.get("smarthome.skill")
-        if sub is not None:
-            self.assertNotIn("smarthome.skill:lights.intent",
-                             sub._intent_samples)
-            self.assertIn("smarthome.skill:door.intent",
-                          sub._intent_samples)
+        self.assertIsNotNone(
+            sub, "detach_intent must not drop the whole domain")
+        self.assertNotIn("smarthome.skill:lights.intent",
+                         sub._intent_samples)
+        self.assertIn("smarthome.skill:door.intent",
+                      sub._intent_samples)
 
     def test_detach_skill_drops_whole_domain(self):
         self._register("smarthome.skill:lights.intent", ["lights on please"])

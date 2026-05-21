@@ -1,6 +1,5 @@
 """Unit tests for DomainMarkovPipeline (no ovoscope required)."""
 import unittest
-from unittest.mock import MagicMock
 
 from ovos_bus_client.message import Message
 from ovos_utils.fakebus import FakeBus
@@ -129,6 +128,15 @@ class TestDomainEngineRouting(unittest.TestCase):
         d.train()
         self.assertNotIn("media", d.domain_engine._intent_samples)
         self.assertNotIn("media", d.domains)
+
+    def test_update_online_resolves_domain_by_membership(self):
+        # Intent label without a domain prefix must still resolve.
+        d = DomainMarkovIntentEngine(order=1, kneser_ney=False, backoff=False)
+        d.register_domain_intent("media", "play", ["play a song"])
+        d.train()
+        d.update_online("play", "put on a track")
+        self.assertIn("put on a track", d.training_data["media"]["play"])
+        self.assertTrue(d._needs_training)
 
 
 if __name__ == "__main__":

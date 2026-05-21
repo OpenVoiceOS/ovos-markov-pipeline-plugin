@@ -194,17 +194,21 @@ class DomainMarkovIntentEngine:
     def update_online(self, intent_name: str, utterance: str) -> None:
         """Reinforce a matched intent with a new sample.
 
-        Retrains the intent's domain sub-engine immediately and marks
-        the router stale so it picks up the new sample on next train.
+        The owning domain is resolved by intent membership, so this
+        works whether *intent_name* carries a ``domain:`` prefix or not.
+        Retrains that domain's sub-engine immediately and marks the
+        router stale so it picks up the new sample on next train.
         """
-        domain = intent_name.split(":", 1)[0] if ":" in intent_name else intent_name
-        sub = self.domains.get(domain)
-        if sub is None:
+        domain = next(
+            (d for d, intents in self.training_data.items()
+             if intent_name in intents),
+            None,
+        )
+        if domain is None:
             return
-        sub.update_online(intent_name, utterance)
-        if intent_name in self.training_data.get(domain, {}):
-            self.training_data[domain][intent_name].append(utterance.strip())
-            self._needs_training = True
+        self.domains[domain].update_online(intent_name, utterance)
+        self.training_data[domain][intent_name].append(utterance.strip())
+        self._needs_training = True
 
     # ── parity with MarkovIntentEngine ─────────────────────────────────────
 

@@ -1,0 +1,21 @@
+name: E2E Tests (ovoscope)
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'ovos_markov_pipeline/**'
+      - 'test/end2end/**'
+      - '.github/workflows/ovoscope.yml'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
+    with:
+      install_extras: "test"
+      test_path: "test/end2end/"
+      # Validate against the unreleased ovoscope dev branch (needed for the
+      # E2EPipelineHarness used by the INTENT-4 consume e2e tests).
+      # Drop this once ovoscope has been released to PyPI.
+      pre_release: true

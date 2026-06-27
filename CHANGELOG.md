@@ -1,57 +1,65 @@
 # Changelog
 
-## [0.4.0a1](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.4.0a1) (2026-05-21)
+## [0.5.0a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.0a1) (2026-06-27)
 
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.3.0a1...0.4.0a1)
-
-**Merged pull requests:**
-
-- feat: softmax-posterior confidence + intent-engine benchmark [\#9](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/9) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.3.0a1](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.3.0a1) (2026-05-21)
-
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a3...0.3.0a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.4.0a1...0.5.0a1)
 
 **Merged pull requests:**
 
-- feat: add DomainMarkovIntentEngine for two-stage intent matching [\#2](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/2) ([JarbasAl](https://github.com/JarbasAl))
+- feat: adopt INTENT-4 spec registration topics \(§6 template\) + dual-namespace e2e [\#11](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/11) ([JarbasAl](https://github.com/JarbasAl))
 
-## [0.2.0a3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.2.0a3) (2026-05-21)
+## [0.4.0a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.4.0a1) (2026-05-21)
 
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a2...0.2.0a3)
-
-**Merged pull requests:**
-
-- test: expand unit coverage to 98% [\#6](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/6) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.0a2](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.2.0a2) (2026-05-21)
-
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.2.0a1...0.2.0a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.3.0a1...0.4.0a1)
 
 **Merged pull requests:**
 
-- ci: fix opm-check to auto-detect the pipeline plugin [\#7](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/7) ([JarbasAl](https://github.com/JarbasAl))
+- feat: softmax-posterior confidence + intent-engine benchmark [\#9](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/9) ([JarbasAl](https://github.com/JarbasAl))
 
-## [0.2.0a1](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.2.0a1) (2026-05-21)
+## [0.3.0a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.3.0a1) (2026-05-21)
 
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.1.0a3...0.2.0a1)
-
-## [0.1.0a3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.1.0a3) (2026-05-21)
-
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/0.1.0a2...0.1.0a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.2.0a3...0.3.0a1)
 
 **Merged pull requests:**
 
-- ci: adopt pre-commit and harden the coverage gate [\#5](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/5) ([JarbasAl](https://github.com/JarbasAl))
-- feat: expand OVOS template syntax in intent samples [\#3](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/3) ([JarbasAl](https://github.com/JarbasAl))
+- feat: add DomainMarkovIntentEngine for two-stage intent matching [\#2](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/2) ([JarbasAl](https://github.com/JarbasAl))
 
-## [0.1.0a2](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/tree/0.1.0a2) (2026-05-21)
+## [0.2.0a3](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.2.0a3) (2026-05-21)
 
-[Full Changelog](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/compare/03a6082ebc045a78e4031de27af3c0645bbce6b2...0.1.0a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.2.0a2...0.2.0a3)
 
 **Merged pull requests:**
 
-- docs: full zero-to-hero documentation set [\#4](https://github.com/TigreGotico/ovos-markov-pipeline-plugin/pull/4) ([JarbasAl](https://github.com/JarbasAl))
+- test: expand unit coverage to 98% [\#6](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/6) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.0a2](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.2.0a2) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.2.0a1...0.2.0a2)
+
+**Merged pull requests:**
+
+- ci: fix opm-check to auto-detect the pipeline plugin [\#7](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/7) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.0a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.2.0a1) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.1.0a3...0.2.0a1)
+
+## [0.1.0a3](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.1.0a3) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.1.0a2...0.1.0a3)
+
+**Merged pull requests:**
+
+- ci: adopt pre-commit and harden the coverage gate [\#5](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/5) ([JarbasAl](https://github.com/JarbasAl))
+- feat: expand OVOS template syntax in intent samples [\#3](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/3) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.1.0a2](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.1.0a2) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/03a6082ebc045a78e4031de27af3c0645bbce6b2...0.1.0a2)
+
+**Merged pull requests:**
+
+- docs: full zero-to-hero documentation set [\#4](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/4) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

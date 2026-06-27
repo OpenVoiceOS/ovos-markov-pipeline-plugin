@@ -23,6 +23,7 @@ from ovos_plugin_manager.templates.pipeline import (
     ConfidenceMatcherPipeline,
     IntentHandlerMatch,
 )
+from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_markov_pipeline._bracket_expansion import expand_template
@@ -470,9 +471,12 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
 
         self.registered_intents: List[str] = []
         self._skill2intent: Dict[str, List[str]] = defaultdict(list)
+        # INTENT-4 §8.5 — intents disabled without losing their definition;
+        # excluded from match candidacy until re-enabled.
+        self.disabled_intents: set = set()
         self.max_words = self.config.get("max_words", 50)
 
-        # Register bus handlers
+        # legacy (padatious-compatible) registration surface
         self.bus.on("padatious:register_intent", self.register_intent)
         self.bus.on("detach_intent", self.handle_detach_intent)
         self.bus.on("detach_skill", self.handle_detach_skill)
@@ -481,6 +485,21 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
             "intent.service.markov.manifest.get",
             self.handle_manifest,
         )
+
+        # OVOS-INTENT-4 registration surface (alongside the legacy one).
+        # Markov is a sample/template matcher, so it consumes the template
+        # registration topic (§6) but NOT the keyword topic (§5/§11). It has
+        # no entity concept, so the entity topics are intentionally not wired.
+        self.bus.on(SpecMessage.INTENT_REGISTER_TEMPLATE.value,
+                    self.handle_register_template)
+        self.bus.on(SpecMessage.INTENT_DEREGISTER.value,
+                    self.handle_deregister_intent_spec)
+        self.bus.on(SpecMessage.SKILL_DEREGISTER.value,
+                    self.handle_deregister_skill_spec)
+        self.bus.on(SpecMessage.INTENT_ENABLE.value,
+                    self.handle_enable_intent_spec)
+        self.bus.on(SpecMessage.INTENT_DISABLE.value,
+                    self.handle_disable_intent_spec)
 
         LOG.info(
             f"Loaded MarkovPipeline (order={order}, kn={kneser_ney}, "
@@ -548,6 +567,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         intent_name = message.data.get("intent_name")
         if intent_name and intent_name in self.registered_intents:
             self.registered_intents.remove(intent_name)
+            self.disabled_intents.discard(intent_name)
             for engine in self.engines.values():
                 self._remove_intent(engine, intent_name)
 
@@ -560,8 +580,85 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         for intent_name in intent_names:
             if intent_name in self.registered_intents:
                 self.registered_intents.remove(intent_name)
+            self.disabled_intents.discard(intent_name)
         for engine in self.engines.values():
             self._remove_skill(engine, skill_id, intent_names)
+
+    # -- OVOS-INTENT-4 registration surface -----------------------------------
+
+    @staticmethod
+    def _spec_label(message: Message, key: str) -> Optional[str]:
+        """Build the internal ``skill_id:<key>`` label from an INTENT-4 payload.
+
+        INTENT-4 carries ``skill_id`` and ``intent_name`` as separate fields
+        (§3.2); markov keys everything on the combined ``skill_id:name`` label,
+        matching the legacy padatious convention.
+        """
+        skill_id = message.data.get("skill_id") or message.context.get("skill_id")
+        name = message.data.get(key)
+        if not skill_id or not name:
+            LOG.warning(f"Ignoring malformed INTENT-4 payload on {message.msg_type!r}: "
+                        f"missing skill_id/{key}")
+            return None
+        return f"{skill_id}:{name}"
+
+    def handle_register_template(self, message: Message) -> None:
+        """Consume ``ovos.intent.register.template`` (INTENT-4 §6).
+
+        Template intents are markov's native definition method. The payload
+        carries inline ``samples`` (OVOS-INTENT-1 templates); ``blacklist`` is a
+        suppression hint markov does not yet honour and is ignored.
+        """
+        skill_id = message.data.get("skill_id") or message.context.get("skill_id")
+        name = self._spec_label(message, "intent_name")
+        if name is None:
+            return
+        samples = message.data.get("samples")
+        if not samples:
+            LOG.warning(f"Ignoring INTENT-4 template registration for {name!r}: "
+                        f"empty samples")
+            return
+
+        lang = standardize_lang_tag(message.data.get("lang", self.lang))
+        self._skill2intent[skill_id].append(name)
+        self.registered_intents.append(name)
+
+        closest = self._get_closest_lang(lang)
+        if closest and closest in self.engines:
+            LOG.debug(f"Registering markov intent (spec): {name} "
+                      f"({len(samples)} samples)")
+            self._add_intent(self.engines[closest], name, samples)
+
+        if self.config.get("instant_train", False) or self.first_train.is_set():
+            self.train(message)
+
+    def handle_deregister_intent_spec(self, message: Message) -> None:
+        """Consume ``ovos.intent.deregister`` (INTENT-4 §8.2)."""
+        name = self._spec_label(message, "intent_name")
+        if name is None:
+            return
+        if name in self.registered_intents:
+            self.registered_intents.remove(name)
+            for engine in self.engines.values():
+                self._remove_intent(engine, name)
+        self.disabled_intents.discard(name)
+
+    def handle_deregister_skill_spec(self, message: Message) -> None:
+        """Consume ``ovos.skill.deregister`` (INTENT-4 §8.4)."""
+        # payload shape matches detach_skill — reuse the legacy handler
+        self.handle_detach_skill(message)
+
+    def handle_enable_intent_spec(self, message: Message) -> None:
+        """Consume ``ovos.intent.enable`` (INTENT-4 §8.5)."""
+        name = self._spec_label(message, "intent_name")
+        if name is not None:
+            self.disabled_intents.discard(name)
+
+    def handle_disable_intent_spec(self, message: Message) -> None:
+        """Consume ``ovos.intent.disable`` (INTENT-4 §8.5)."""
+        name = self._spec_label(message, "intent_name")
+        if name is not None:
+            self.disabled_intents.add(name)
 
     # ------------------------------------------------------------------
     # Engine-shape hooks — overridden by DomainMarkovPipeline
@@ -650,6 +747,8 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                 blacklisted_intents=sess.blacklisted_intents,
                 blacklisted_skills=sess.blacklisted_skills,
             )
+            # INTENT-4 §8.5 — disabled intents are excluded from candidacy
+            scores = [s for s in scores if s[0] not in self.disabled_intents]
             if scores and scores[0][1] > best_conf:
                 best_intent, best_conf = scores[0]
 
@@ -711,6 +810,16 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
             "intent.service.markov.manifest.get",
             self.handle_manifest,
         )
+        self.bus.remove(SpecMessage.INTENT_REGISTER_TEMPLATE.value,
+                        self.handle_register_template)
+        self.bus.remove(SpecMessage.INTENT_DEREGISTER.value,
+                        self.handle_deregister_intent_spec)
+        self.bus.remove(SpecMessage.SKILL_DEREGISTER.value,
+                        self.handle_deregister_skill_spec)
+        self.bus.remove(SpecMessage.INTENT_ENABLE.value,
+                        self.handle_enable_intent_spec)
+        self.bus.remove(SpecMessage.INTENT_DISABLE.value,
+                        self.handle_disable_intent_spec)
 
 
 # Re-export DomainMarkovIntentEngine at the package root for parity with

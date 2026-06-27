@@ -6,6 +6,7 @@ intent names differ from Padatious format.
 """
 
 import unittest
+from importlib.util import find_spec
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
@@ -14,6 +15,28 @@ try:
     from ovoscope import CaptureSession, get_minicroft
 except ImportError:
     raise unittest.SkipTest("ovoscope not installed")
+
+
+def _skills_installed(*module_names: str) -> bool:
+    """True only if every real-skill fixture package is importable.
+
+    These tests load real OVOS skills (hello-world, naptime) into a MiniCroft.
+    When the skill packages are absent ``get_minicroft`` boots with zero skills
+    and the assertions fail rather than skip; gate the whole module on their
+    presence so it skips cleanly in environments that do not (or cannot, due to
+    their stale OVOS pins) install them.
+    """
+    return all(find_spec(name) is not None for name in module_names)
+
+
+#: Importable module names for the skill fixtures these tests need.
+_REQUIRED_SKILL_MODULES = ("ovos_skill_hello_world", "ovos_skill_naptime")
+
+if not _skills_installed(*_REQUIRED_SKILL_MODULES):
+    raise unittest.SkipTest(
+        "real-skill fixtures (ovos-skill-hello-world / ovos-skill-naptime) "
+        "not installed; skipping MiniCroft skill-loading e2e"
+    )
 
 
 MARKOV_PIPELINE = [

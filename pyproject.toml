@@ -27,11 +27,12 @@ dependencies = [
 [project.optional-dependencies]
 stem = ["snowballstemmer"]
 test = ["pytest", "pytest-cov", "snowballstemmer"]
-benchmark = ["nebulento"]
+benchmark = ["padaos", "padatious", "fann2==1.0.7", "nebulento", "datasets"]
 
 [project.entry-points."opm.pipeline"]
 ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"
 ovos-markov-domain-pipeline-plugin = "ovos_markov_pipeline:DomainMarkovPipeline"
+ovos-markov-hierarchical-pipeline-plugin = "ovos_markov_pipeline:HierarchicalMarkovPipeline"
 
 [tool.setuptools.dynamic]
 version = { attr = "ovos_markov_pipeline.version.__version__" }

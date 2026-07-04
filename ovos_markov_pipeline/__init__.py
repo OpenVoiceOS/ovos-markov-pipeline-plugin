@@ -901,3 +901,91 @@ class DomainMarkovPipeline(MarkovPipeline):
                       skill_id: str, intent_names: List[str]) -> None:
         # In domain mode the skill_id IS the domain.
         engine.remove_domain(skill_id)
+
+
+from ovos_markov_pipeline.hierarchical_engine import HierarchicalMarkovIntentEngine  # noqa: E402, F401
+
+
+class HierarchicalMarkovPipeline(MarkovPipeline):
+    """Two-stage hierarchical Markov pipeline with domain routing.
+
+    Same behaviour as :class:`MarkovPipeline` except the per-language
+    engine is a :class:`HierarchicalMarkovIntentEngine`. Each Padatious
+    intent is grouped under a domain == ``skill_id`` (taken from the
+    intent label's ``<skill_id>:<intent>`` prefix); inference first routes
+    the utterance to a single domain with a top-level classifier, then
+    scores only that domain's intents.
+
+    Configuration is read from
+    ``intents.ovos-markov-hierarchical-pipeline-plugin`` so this pipeline
+    can coexist with the flat and domain plugins in the same OVOS
+    instance. Accepts every key the flat plugin does, plus
+    ``domain_threshold`` — the minimum top-level classifier confidence
+    required to route a query (``0.0`` disables the gate).
+
+    Example ``mycroft.conf``::
+
+        "intents": {
+            "ovos-markov-hierarchical-pipeline-plugin": {
+                "order": 2,
+                "kneser_ney": true,
+                "backoff": true,
+                "conf_high": 0.50,
+                "conf_med": 0.30,
+                "conf_low": 0.15,
+                "domain_threshold": 0.0,
+                "instant_train": true
+            }
+        }
+    """
+
+    def __init__(
+        self,
+        bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+        config: Optional[Dict] = None,
+    ) -> None:
+        if config is None:
+            intent_config = Configuration().get("intents", {})
+            config = (
+                intent_config.get("ovos-markov-hierarchical-pipeline-plugin")
+                or intent_config.get("ovos_markov_hierarchical_pipeline_plugin")
+                or {}
+            )
+        # set before super().__init__ — _build_engines() runs inside it
+        self.domain_threshold = (config or {}).get("domain_threshold", 0.0)
+        super().__init__(bus, config)
+
+    # ------------------------------------------------------------------
+    # Hook overrides — swap engine shape and route adds/removes by domain
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _domain_of(name: str) -> str:
+        """Extract the domain (skill_id) from a ``skill_id:intent`` label."""
+        return name.split(":", 1)[0] if ":" in name else name
+
+    def _build_engines(self) -> Dict[str, HierarchicalMarkovIntentEngine]:
+        return {
+            lang: HierarchicalMarkovIntentEngine(
+                domain_threshold=self.domain_threshold,
+                stemmer=self.stemmers.get(lang),
+                **self._engine_kwargs_template,
+            )
+            for lang in self._langs
+        }
+
+    def _add_intent(self, engine: HierarchicalMarkovIntentEngine,
+                    name: str, samples: List[str]) -> None:
+        engine.register_domain_intent(self._domain_of(name), name, samples)
+
+    def _remove_intent(self, engine: HierarchicalMarkovIntentEngine,
+                       name: str) -> None:
+        engine.remove_domain_intent(self._domain_of(name), name)
+
+    def _remove_skill(self, engine: HierarchicalMarkovIntentEngine,
+                      skill_id: str, intent_names: List[str]) -> None:
+        # In hierarchical mode the skill_id IS the domain.
+        engine.remove_domain(skill_id)
+
+    def shutdown(self) -> None:  # noqa: D401 — inherits docstring
+        super().shutdown()

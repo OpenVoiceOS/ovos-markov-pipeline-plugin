@@ -44,6 +44,7 @@ utterance
 | ------------------ | --------------------------------------------------------------------------- |
 | `__init__.py`      | `MarkovPipeline`, `DomainMarkovPipeline` (OPM entry points), `MarkovIntentEngine` |
 | `domain_engine.py` | `DomainMarkovIntentEngine` — two-stage router → intent engine                |
+| `hierarchical_engine.py` | `HierarchicalMarkovIntentEngine` — domain classifier → per-domain intent engine |
 | `slots.py`         | `SlotExtractor` — HMM BIO entity extraction                                 |
 | `cache.py`         | `IntentCache` — ONNX disk cache for trained models                          |
 | `calibration.py`   | `evaluate()`, `find_optimal_thresholds()`                                   |
@@ -54,8 +55,10 @@ utterance
 |---|---|---|
 | `ovos-markov-pipeline-plugin` | `MarkovPipeline` | `intents.ovos-markov-pipeline-plugin` |
 | `ovos-markov-domain-pipeline-plugin` | `DomainMarkovPipeline` | `intents.ovos-markov-domain-pipeline-plugin` |
+| `ovos-markov-hierarchical-pipeline-plugin` | `HierarchicalMarkovPipeline` | `intents.ovos-markov-hierarchical-pipeline-plugin` |
 
-See [Domain pipeline](domain_engine.md) for the domain-grouped variant.
+See [Domain pipeline](domain_engine.md) for the domain-grouped variant and
+[Hierarchical pipeline](hierarchical_engine.md) for the two-stage routed variant.
 
 ## Requirements
 

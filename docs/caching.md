@@ -25,7 +25,7 @@ cache.save_intent("weather:forecast", trained_chain)
 # On the next boot, reload it:
 runtime = cache.load_intent("weather:forecast", order=2)
 if runtime is None:
-    ...  # not cached — train normally
+    ...  # not cached: train normally
 ```
 
 ## API
@@ -42,8 +42,11 @@ if runtime is None:
 
 - The cache directory is created on construction if it does not exist.
 - Intent names are made filesystem-safe: `:` becomes `__` and `/` becomes `_`.
-- `save_intent` and `load_intent` never raise — an export or load failure is
+- `save_intent` and `load_intent` never raise: an export or load failure is
   logged and `load_intent` returns `None`, so a corrupt cache degrades to a
   normal training pass rather than a crash.
-- A cached model is only valid for the `order` it was trained with; pass the
+- A cached model is only valid for the `order` it was trained with. Pass the
   same `order` to `load_intent`.
+
+---
+[← Calibration](calibration.md) · [Home](index.md) · [Benchmark →](benchmark.md)

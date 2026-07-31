@@ -36,7 +36,7 @@ Every key is optional; the values above are the defaults.
 | `backoff`    | `true`  | Interpolate with lower-order models when an n-gram is unseen.           |
 | `smoothing`  | `1e-5`  | Laplace smoothing alpha (the additive count for unseen n-grams).        |
 
-`order` is the single most impactful setting — see [Tuning](tuning.md) for how
+`order` is the single most impactful setting: see [Tuning](tuning.md) for how
 to choose it. `kneser_ney` and `backoff` both help the model cope with words it
 did not see during training and are best left enabled.
 
@@ -93,3 +93,6 @@ labelled data.
 | Key         | Default | Meaning                                                       |
 | ----------- | ------- | ------------------------------------------------------------- |
 | `max_words` | `50`    | Utterances longer than this many words are skipped (ignored). |
+
+---
+[← Quickstart](quickstart.md) · [Home](index.md) · [Tuning →](tuning.md)

@@ -11,19 +11,19 @@ the [Quickstart](quickstart.md).
 
 For users integrating the plugin into an OVOS install:
 
-1. [Concepts](concepts.md) — the idea behind perplexity-based intent matching
-2. [Quickstart](quickstart.md) — install and enable the pipeline
-3. [Configuration](configuration.md) — every config key, with defaults
-4. [Tuning](tuning.md) — get the best accuracy for your skill set
-5. [Troubleshooting](troubleshooting.md) — when something does not match
+1. [Concepts](concepts.md): the idea behind perplexity-based intent matching
+2. [Quickstart](quickstart.md): install and enable the pipeline
+3. [Configuration](configuration.md): every config key, with defaults
+4. [Tuning](tuning.md): get the best accuracy for your skill set
+5. [Troubleshooting](troubleshooting.md): when something does not match
 
 For developers building on or extending the plugin:
 
-1. [Pipeline integration](pipeline.md) — the OPM entry point and bus protocol
-2. [Entity extraction](entities.md) — HMM BIO slot tagging with `SlotExtractor`
-3. [Calibration](calibration.md) — `evaluate()` and `find_optimal_thresholds()`
-4. [Model caching](caching.md) — exporting trained models to ONNX
-5. [Benchmark](benchmark.md) — accuracy and speed against the nebulento dataset
+1. [Pipeline integration](pipeline.md): the OPM entry point and bus protocol
+2. [Entity extraction](entities.md): HMM BIO slot tagging with `SlotExtractor`
+3. [Calibration](calibration.md): `evaluate()` and `find_optimal_thresholds()`
+4. [Model caching](caching.md): exporting trained models to ONNX
+5. [Benchmark](benchmark.md): accuracy and speed against the nebulento dataset
 
 ## At a glance
 
@@ -43,9 +43,9 @@ utterance
 | Module             | Public API                                                                  |
 | ------------------ | --------------------------------------------------------------------------- |
 | `__init__.py`      | `MarkovPipeline`, `DomainMarkovPipeline` (OPM entry points), `MarkovIntentEngine` |
-| `domain_engine.py` | `DomainMarkovIntentEngine` — two-stage router → intent engine                |
-| `slots.py`         | `SlotExtractor` — HMM BIO entity extraction                                 |
-| `cache.py`         | `IntentCache` — ONNX disk cache for trained models                          |
+| `domain_engine.py` | `DomainMarkovIntentEngine`: two-stage router → intent engine                |
+| `slots.py`         | `SlotExtractor`: HMM BIO entity extraction                                 |
+| `cache.py`         | `IntentCache`: ONNX disk cache for trained models                          |
 | `calibration.py`   | `evaluate()`, `find_optimal_thresholds()`                                   |
 
 ## OPM entry points
@@ -60,6 +60,6 @@ See [Domain pipeline](domain_engine.md) for the domain-grouped variant.
 ## Requirements
 
 - Python 3.10+
-- [`markovonnx`](https://pypi.org/project/markovonnx/) — Markov chain models
+- [`markovonnx`](https://pypi.org/project/markovonnx/): Markov chain models
 - `ovos-plugin-manager`, `ovos-bus-client`, `ovos-config`, `ovos-utils`
-- `snowballstemmer` (optional, for stemming) — install the `stem` extra
+- `snowballstemmer` (optional, for stemming): install the `stem` extra

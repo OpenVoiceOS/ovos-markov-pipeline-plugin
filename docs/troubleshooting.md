@@ -64,8 +64,11 @@ word/character blend breaks the tie using spelling cues.
 `conf_high` are appended to that intent's samples and the model retrains, so it
 adapts to real phrasings.
 
-**Does it support entities/slots?** Yes — `SlotExtractor` uses an HMM with BIO
+**Does it support entities/slots?** Yes: `SlotExtractor` uses an HMM with BIO
 tagging. See [Entity extraction](entities.md).
 
-**Can I cache models to disk?** Yes — `IntentCache` exports trained models to
+**Can I cache models to disk?** Yes: `IntentCache` exports trained models to
 ONNX plus a vocabulary JSON for instant reload. See [Model caching](caching.md).
+
+---
+[← Tuning](tuning.md) · [Home](index.md)

@@ -105,3 +105,6 @@ Compared to other OVOS intent matchers:
 It is a strong lightweight baseline and a useful comparison point. For large,
 overlapping skill sets a discriminative classifier will usually edge it out on
 accuracy.
+
+---
+[Home](index.md) · [Quickstart →](quickstart.md)

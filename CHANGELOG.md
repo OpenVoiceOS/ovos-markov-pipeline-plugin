@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0a2](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.0a2) (2026-07-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.5.0a1...0.5.0a2)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#12](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/12) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.5.0a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.0a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.4.0a1...0.5.0a1)

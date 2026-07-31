@@ -38,7 +38,7 @@ the low tier late, interleaving other matchers as you wish.
 
 ## 3. Restart and use
 
-Restart `ovos-core`. Skills register their intents over the bus on load — no
+Restart `ovos-core`. Skills register their intents over the bus on load: no
 skill-side change is needed. The plugin trains its models on first use (or
 immediately, if `instant_train` is set) and starts matching.
 
@@ -74,6 +74,9 @@ confidence, highest first.
 
 ## Next steps
 
-- [Configuration](configuration.md) — tune the model to your skill set
-- [Tuning](tuning.md) — practical advice on order, stemming and fallbacks
-- [Troubleshooting](troubleshooting.md) — when matches are wrong or missing
+- [Configuration](configuration.md): tune the model to your skill set
+- [Tuning](tuning.md): practical advice on order, stemming, and fallbacks
+- [Troubleshooting](troubleshooting.md): when matches are wrong or missing
+
+---
+[← Concepts](concepts.md) · [Home](index.md) · [Configuration →](configuration.md)

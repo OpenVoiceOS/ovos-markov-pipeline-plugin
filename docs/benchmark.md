@@ -17,7 +17,7 @@ Note    : test utterances are natural human phrasing, NOT template fills.
 
 22 intents across media, smart home, timers, alarms, weather, calendar,
 communication, navigation, reminders, shopping, and system control. The
-`test_match` utterances are deliberately *not* template fills — they use
+`test_match` utterances are deliberately *not* template fills: they use
 contractions, filler words, politeness markers, and word-order variation,
 as real STT output does. The 24 `NO_MATCH_UTTERANCES` are plausible but
 off-topic, several sharing words with real intents.
@@ -26,13 +26,13 @@ off-topic, several sharing words with real intents.
 
 Each engine reports:
 
-- **Argmax recall** — how often the top-ranked intent is correct, with no
+- **Argmax recall**: how often the top-ranked intent is correct, with no
   confidence threshold. This is the method ceiling.
-- **AUC** — ROC-AUC of the confidence separating correct argmax matches
+- **AUC**: ROC-AUC of the confidence separating correct argmax matches
   from wrong / no-match cases. How well the confidence discriminates.
-- **F1 @0.5** — F1 with no-match gating at a fixed `0.5` threshold,
+- **F1 @0.5**: F1 with no-match gating at a fixed `0.5` threshold,
   matching the nebulento benchmark methodology.
-- **F1 @best** — F1 at the F1-optimal threshold, swept per engine.
+- **F1 @best**: F1 at the F1-optimal threshold, swept per engine.
 
 The Markov engine's confidence is a softmax posterior over the per-intent
 perplexities, so it reflects how far the winning intent outscored the
@@ -56,20 +56,20 @@ argmax recall is 45.1% (`char_fallback`) against nebulento's 53.7%. A
 per-intent Markov chain scores an utterance by n-gram perplexity, so it
 rewards utterances that share n-grams with the training templates.
 Natural-phrasing test utterances rarely share 2-grams with a terse
-template, which drives perplexity up. Fuzzy token-set matching is more
-robust to paraphrase and word reordering because it compares token sets,
-not token sequences.
+template, which drives perplexity up. Fuzzy token-set matching handles
+paraphrase and word reordering better because it compares token sets, not
+token sequences.
 
 **The confidence discriminates well.** The softmax posterior gives the
-word-level configs an AUC around 0.92 — higher than nebulento's 0.764 —
-so the confidence reliably separates correct matches from wrong ones. A
-correct match lands around 0.6, a wrong one around 0.05.
+word-level configs an AUC around 0.92, higher than nebulento's 0.764, so the
+confidence reliably separates correct matches from wrong ones. A correct
+match lands around 0.6, a wrong one around 0.05.
 
 **The F1 ceiling is argmax recall.** F1 @best is ~0.48 (`order=1`) and
 ~0.59 (`char_fallback`), against nebulento's 0.668. Confidence quality
 does not close that gap: the 55–73% of natural-phrasing utterances the
 n-gram chains do not rank correctly stay wrong regardless of threshold.
-To raise F1, raise argmax recall — more or broader training templates, or
+To raise F1, raise argmax recall: more or broader training templates, or
 a different matcher.
 
 **Use a calibrated threshold, not a literal 0.5.** The F1-optimal
@@ -79,9 +79,9 @@ and the pipeline's `conf_high` / `conf_med` / `conf_low` tiers.
 
 **`char_fallback` helps recall but costs latency.** It lifts argmax
 recall from 27.0% to 45.1% by blending a character-level model when the
-top two word-level scores are close — useful against spelling and
-morphology variation — but raises median query latency from ~1 ms to
-~12 ms. It also lowers AUC (0.92 → 0.80): the blend narrows the posterior
+top two word-level scores are close, which helps against spelling and
+morphology variation. It raises median query latency from ~1 ms to
+~12 ms, though, and lowers AUC (0.92 → 0.80): the blend narrows the posterior
 margin between intents.
 
 **Higher n-gram order does not help here.** `order=1` beats `order=2` on
@@ -102,4 +102,7 @@ python benchmark/compare.py
 ```
 
 The nebulento baseline is skipped automatically if nebulento is not
-installed; the Markov rows still run.
+installed. The Markov rows still run.
+
+---
+[← Model caching](caching.md) · [Home](index.md)

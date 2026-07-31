@@ -13,8 +13,8 @@ ovos-markov-pipeline-plugin = "ovos_markov_pipeline:MarkovPipeline"
 ```
 
 `MarkovPipeline` subclasses `ConfidenceMatcherPipeline`, so OVOS exposes it at
-three confidence tiers — `ovos-markov-pipeline-plugin-high`, `-medium` and
-`-low` — which are the names placed in the `intents.pipeline` list.
+three confidence tiers: `ovos-markov-pipeline-plugin-high`, `-medium` and
+`-low`: which are the names placed in the `intents.pipeline` list.
 
 ## Construction
 
@@ -22,9 +22,9 @@ three confidence tiers — `ovos-markov-pipeline-plugin-high`, `-medium` and
 MarkovPipeline(bus=None, config=None)
 ```
 
-- `bus` — an `ovos-bus-client` `MessageBusClient` or a `FakeBus`. OVOS supplies
-  the real bus; tests can pass a `FakeBus`.
-- `config` — the plugin config dict. When omitted it is read from
+- `bus`: an `ovos-bus-client` `MessageBusClient` or a `FakeBus`. OVOS supplies
+  the real bus. Tests can pass a `FakeBus`.
+- `config`: the plugin config dict. When omitted it is read from
   `Configuration()["intents"]["ovos-markov-pipeline-plugin"]`.
 
 On construction the plugin builds one `MarkovIntentEngine` per configured
@@ -44,10 +44,10 @@ messages.
 | `intent.service.markov.manifest.get`   | Request the list of registered intents.                     |
 
 `padatious:register_intent` is reused so that skills need no Markov-specific
-code — any skill that registers a padatious-style intent is matchable. The
+code: any skill that registers a padatious-style intent is matchable. The
 message `data` carries `name`, `samples` (a list of strings) or `file_name`,
 `lang`, and `skill_id` (also accepted from `context`). A registration missing
-`name` is rejected; one missing `skill_id` is attributed to `anonymous_skill`.
+`name` is rejected. One missing `skill_id` is attributed to `anonymous_skill`.
 
 ### Messages emitted
 
@@ -80,9 +80,9 @@ The returned `IntentHandlerMatch` carries `match_type` (the intent name),
 
 ## Training lifecycle
 
-Training is guarded by an `RLock` and a `finished_training_event`, so concurrent
+An `RLock` and a `finished_training_event` guard training, so concurrent
 `mycroft.skills.train` messages and registrations are serialized. When
-`instant_train` is `false`, registrations only mark engines dirty; the first
+`instant_train` is `false`, registrations only mark engines dirty. The first
 match request or an explicit train message triggers the actual training pass.
 
 ## MarkovIntentEngine
@@ -90,11 +90,14 @@ match request or an explicit train message triggers the actual training pass.
 `MarkovIntentEngine` is the per-language matching core and is usable
 standalone. Key methods:
 
-- `add_intent(name, samples)` — register an intent (marks the engine dirty).
-- `remove_intent(name)` — drop an intent.
-- `train()` — build the shared vocabulary and one chain per intent.
-- `calc_intents(utterance, blacklisted_intents=None, blacklisted_skills=None)` —
+- `add_intent(name, samples)`: register an intent (marks the engine dirty).
+- `remove_intent(name)`: drop an intent.
+- `train()`: build the shared vocabulary and one chain per intent.
+- `calc_intents(utterance, blacklisted_intents=None, blacklisted_skills=None)`:
   return `(intent_name, confidence)` pairs sorted by confidence.
-- `update_online(intent_name, utterance)` — append a sample and retrain.
+- `update_online(intent_name, utterance)`: append a sample and retrain.
 
 See [Quickstart](quickstart.md) for a standalone usage example.
+
+---
+[Home](index.md) · [Domain pipeline →](domain_engine.md)

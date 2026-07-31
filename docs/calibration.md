@@ -43,7 +43,7 @@ The returned dict contains:
 | `correct`                   | Number classified correctly.                         |
 
 A healthy model has `avg_confidence_correct` well above
-`avg_confidence_incorrect` — that gap is what the confidence thresholds exploit.
+`avg_confidence_incorrect`: that gap is what the confidence thresholds exploit.
 
 ## find_optimal_thresholds()
 
@@ -58,7 +58,7 @@ print(result["best_threshold"], result["best_f1"])
 ```
 
 The returned dict contains `best_threshold`, `best_f1`, `precision_at_best` and
-`recall_at_best`. `steps` controls the search resolution — `steps=20` tests
+`recall_at_best`. `steps` controls the search resolution: `steps=20` tests
 thresholds `0.00, 0.05, ... 1.00`.
 
 ## Applying the result
@@ -72,3 +72,6 @@ Use the search results to set `conf_high`, `conf_med` and `conf_low` in
 
 Re-run `evaluate()` with the new thresholds in mind to confirm the trade-off
 matches what your skills need.
+
+---
+[← Entity extraction](entities.md) · [Home](index.md) · [Model caching →](caching.md)

@@ -2,10 +2,10 @@
 
 This page documents two layers that ship together:
 
-* **`DomainMarkovPipeline`** — the OPM-discoverable pipeline class. Entry point: `ovos-markov-domain-pipeline-plugin`. Subclasses the flat `MarkovPipeline`; the only differences are the per-language engine shape (below) and that intents are routed to a domain == `skill_id` at registration time.
-* **`DomainMarkovIntentEngine`** — the domain-aware variant of `MarkovIntentEngine` used internally by that pipeline.
+* **`DomainMarkovPipeline`**: the OPM-discoverable pipeline class. Entry point: `ovos-markov-domain-pipeline-plugin`. It subclasses the flat `MarkovPipeline`. The differences are the per-language engine shape (below) and that intents are routed to a domain equal to `skill_id` at registration time.
+* **`DomainMarkovIntentEngine`**: the domain-aware variant of `MarkovIntentEngine` used internally by that pipeline.
 
-A separate entry point (rather than a `domain_engine: true` config flag on the flat pipeline) keeps the two pipelines independently selectable in `default_pipeline` ordering and lets each have its own `intents.<key>` config block.
+A separate entry point, rather than a `domain_engine: true` config flag on the flat pipeline, keeps the two pipelines independently selectable in `default_pipeline` ordering. It also lets each pipeline keep its own `intents.<key>` config block.
 
 ## Enabling
 
@@ -29,7 +29,7 @@ Add it to your OVOS config and place it in your pipeline order alongside (or in 
 }
 ```
 
-Configuration keys are read from `intents.ovos-markov-domain-pipeline-plugin`. The pipeline accepts every key the flat plugin does — the per-domain sub-engines inherit the same `order`, smoothing, stemmer, and char-fallback settings.
+Configuration keys are read from `intents.ovos-markov-domain-pipeline-plugin`. The pipeline accepts every key the flat plugin does. The per-domain sub-engines inherit the same `order`, smoothing, stemmer, and char-fallback settings.
 
 Pipeline order entries follow the standard confidence-tier naming:
 
@@ -41,18 +41,18 @@ Pipeline order entries follow the standard confidence-tier naming:
 
 ## Domain engine
 
-`DomainMarkovIntentEngine` groups intents into *domains*, each owning its own `MarkovIntentEngine`. A top-level **router** — itself a `MarkovIntentEngine` whose "intents" are the domains — first picks the most likely domain for an utterance; that domain's sub-engine then resolves the concrete intent. This mirrors the two-stage domain → intent model used by the other OVOS intent plugins (`nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, `linha_fina.DomainIntentEngine`).
+`DomainMarkovIntentEngine` groups intents into *domains*, each owning its own `MarkovIntentEngine`. A top-level **router**, itself a `MarkovIntentEngine` whose "intents" are the domains, first picks the most likely domain for an utterance. That domain's sub-engine then resolves the concrete intent. This mirrors the two-stage domain-to-intent model used by the other OVOS intent plugins: `nebulento.DomainIntentContainer`, `ovos_padatious.DomainIntentContainer`, `palavreado.DomainIntentContainer`, `padacioso.DomainIntentContainer`, and `linha_fina.DomainIntentEngine`.
 
 ## Why a router
 
-A `MarkovIntentEngine` builds **one shared vocabulary** from the union of its intents' samples. Perplexity — and the confidence derived from it — is only calibrated against intents trained on that same vocabulary.
+A `MarkovIntentEngine` builds **one shared vocabulary** from the union of its intents' samples. Perplexity, and the confidence derived from it, is only calibrated against intents trained on that same vocabulary.
 
-If every domain sub-engine scored the utterance independently and a flat global argmax picked the winner, it would be comparing confidences computed against **different-sized vocabularies** (each domain's own). That is not a valid ranking — a domain with a smaller vocabulary gets a systematic confidence bias.
+If every domain sub-engine scored the utterance independently and a flat global argmax picked the winner, it would compare confidences computed against **different-sized vocabularies** (each domain's own). That is not a valid ranking. A domain with a smaller vocabulary gets a systematic confidence bias.
 
 Two-stage routing keeps every comparison within a single vocabulary:
 
-1. **Routing stage** — the router scores the utterance against each domain. Every domain is one router "intent" trained on the concatenation of that domain's intent samples, so all domains share the router's (global) vocabulary and rank consistently.
-2. **Resolution stage** — only the routed domain's sub-engine runs. Its intents all share that domain's vocabulary, so their confidences rank consistently.
+1. **Routing stage**: the router scores the utterance against each domain. Every domain is one router "intent" trained on the concatenation of that domain's intent samples, so all domains share the router's (global) vocabulary and rank consistently.
+2. **Resolution stage**: only the routed domain's sub-engine runs. Its intents all share that domain's vocabulary, so their confidences rank consistently.
 
 The returned confidences therefore always come from a single sub-engine over a single vocabulary.
 
@@ -63,7 +63,7 @@ The returned confidences therefore always come from a single sub-engine over a s
                  │
                  ▼
        ┌───────────────────────────────┐
-       │ domain_engine.calc_intent()   │   router — one MarkovChain
+       │ domain_engine.calc_intent()   │   router: one MarkovChain
        │   (router)                    │   per domain, shared vocab
        └───────────────────────────────┘
                  │
@@ -92,7 +92,7 @@ Every `padatious:register_intent` event with name `<skill_id>:<intent>` triggers
 
 ## Usage
 
-The pipeline is OPM-discoverable; instantiate via the bus the same way as the flat plugin. For programmatic use of the engine alone:
+The pipeline is OPM-discoverable. Instantiate it over the bus the same way as the flat plugin. For programmatic use of the engine alone:
 
 ```python
 from ovos_markov_pipeline import DomainMarkovIntentEngine
@@ -121,5 +121,8 @@ d.calc_intent("play africa", domain="media")
 
 ## See also
 
-- [Pipeline overview](index.md) — flat `MarkovPipeline` and its bus messages.
-- The OPM entry-point list in `pyproject.toml` — both pipelines are registered.
+- [Pipeline overview](pipeline.md): flat `MarkovPipeline` and its bus messages.
+- The OPM entry-point list in `pyproject.toml`: both pipelines are registered.
+
+---
+[← Pipeline integration](pipeline.md) · [Home](index.md) · [Entity extraction →](entities.md)

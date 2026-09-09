@@ -572,10 +572,18 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
                 self._remove_intent(engine, intent_name)
 
     def handle_detach_skill(self, message: Message) -> None:
-        """Remove all intents for a skill."""
+        """Remove all intents for a skill (legacy ``detach_skill``).
+
+        The legacy wire carries no required payload identity, so the context
+        is the only identity available when the payload omits one.
+        """
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
         if not skill_id:
             return
+        self._forget_skill(skill_id)
+
+    def _forget_skill(self, skill_id: str) -> None:
+        """Drop every intent registered by *skill_id*."""
         intent_names = self._skill2intent.pop(skill_id, [])
         for intent_name in intent_names:
             if intent_name in self.registered_intents:
@@ -593,8 +601,12 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         INTENT-4 carries ``skill_id`` and ``intent_name`` as separate fields
         (§3.2); markov keys everything on the combined ``skill_id:name`` label,
         matching the legacy padatious convention.
+
+        §3.2: a message of §§5-8 acts on its payload ``skill_id``, and
+        ``context.skill_id`` names the source, so it is never substituted
+        for the target.
         """
-        skill_id = message.data.get("skill_id") or message.context.get("skill_id")
+        skill_id = message.data.get("skill_id")
         name = message.data.get(key)
         if not skill_id or not name:
             LOG.warning(f"Ignoring malformed INTENT-4 payload on {message.msg_type!r}: "
@@ -609,7 +621,7 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         carries inline ``samples`` (OVOS-INTENT-1 templates); ``blacklist`` is a
         suppression hint markov does not yet honour and is ignored.
         """
-        skill_id = message.data.get("skill_id") or message.context.get("skill_id")
+        skill_id = message.data.get("skill_id")
         name = self._spec_label(message, "intent_name")
         if name is None:
             return
@@ -644,9 +656,18 @@ class MarkovPipeline(ConfidenceMatcherPipeline):
         self.disabled_intents.discard(name)
 
     def handle_deregister_skill_spec(self, message: Message) -> None:
-        """Consume ``ovos.skill.deregister`` (INTENT-4 §8.4)."""
-        # payload shape matches detach_skill — reuse the legacy handler
-        self.handle_detach_skill(message)
+        """Consume ``ovos.skill.deregister`` (INTENT-4 §8.4).
+
+        §3.2: the payload names the skill to remove and ``context.skill_id``
+        names the source, so a payload without an identity has no target and
+        is rejected rather than being applied to whoever sent it.
+        """
+        skill_id = message.data.get("skill_id")
+        if not skill_id:
+            LOG.warning(f"Ignoring malformed INTENT-4 payload on "
+                        f"{message.msg_type!r}: missing skill_id")
+            return
+        self._forget_skill(skill_id)
 
     def handle_enable_intent_spec(self, message: Message) -> None:
         """Consume ``ovos.intent.enable`` (INTENT-4 §8.5)."""

@@ -123,7 +123,7 @@ class TestLegacyStillConsumed(_Intent4MarkovHarness):
 
     def test_legacy_template_registration_still_matches(self):
         from ovoscope import register_padatious_intent
-        register_padatious_intent(self.bus, f"{self.SKILL_ID}:bye", _BYE)
+        register_padatious_intent(self.bus, f"{self.SKILL_ID}:bye", _BYE, skill_id=self.SKILL_ID)
         time.sleep(1.0)
         msg = self._capture_match("goodbye", "bye")
         self.assertIsNotNone(msg, "legacy registration must still match")

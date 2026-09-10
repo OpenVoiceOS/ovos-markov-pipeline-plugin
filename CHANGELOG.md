@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.2a1) (2026-09-10)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.5.1a1...0.5.2a1)
+
+**Merged pull requests:**
+
+- fix: spec registrations resolve the skill from the payload only [\#16](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/16) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.5.1a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.1a1) (2026-09-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.5.0a2...0.5.1a1)

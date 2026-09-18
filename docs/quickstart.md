@@ -66,8 +66,14 @@ engine.add_intent("timer", [
 engine.train()
 
 scores = engine.calc_intents("what's the weather like")
-print(scores[0])  # ('weather', 0.78)
+print(scores[0])  # ('weather', 0.5)
 ```
+
+With this tiny four-sample-per-intent example, the softmax posterior comes out tied
+between both intents (`0.5`/`0.5`). The winning intent is still first in the returned
+list, but the confidence value alone will not discriminate a real deployment's larger
+skill set this way. See [Calibration](calibration.md) for measuring and tuning
+confidence on your own training data.
 
 `calc_intents` returns a list of `(intent_name, confidence)` pairs sorted by
 confidence, highest first.

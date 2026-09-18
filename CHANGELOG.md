@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2a2](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.2a2) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.5.2a1...0.5.2a2)
+
+**Merged pull requests:**
+
+- docs: fix wrong quickstart confidence score, both intents tie at 0.5 [\#13](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/pull/13) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.5.2a1](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/tree/0.5.2a1) (2026-09-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-markov-pipeline-plugin/compare/0.5.1a1...0.5.2a1)
